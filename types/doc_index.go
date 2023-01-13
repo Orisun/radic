@@ -1,6 +1,6 @@
 // Date         : 2018/7/28
 // Author       : zhangchaoyang
-// Description  : 
+// Description  :
 package types
 
 import (
@@ -16,18 +16,18 @@ type DocInfo struct {
 	DocId            uint32
 	CompositeFeature uint32     //32个bit分别对应32个bool属性
 	Keyword          []*Keyword //倒排索引的key
-	RankScore        float32
+	RankScore        float32    //作为PreRankCriteria的输入参数，PreRankCriteria的输出是截断前排序的依据
 	Entry            []byte     //正排详情，自行做序列化
 }
 
-func (self *DocInfo) EntryEqual(other *DocInfo) bool {
-	if self.Entry == nil && other.Entry == nil {
+func (doc *DocInfo) EntryEqual(other *DocInfo) bool {
+	if doc.Entry == nil && other.Entry == nil {
 		return true
 	}
-	if len(self.Entry) != len(other.Entry) {
+	if len(doc.Entry) != len(other.Entry) {
 		return false
 	}
-	for i, ele := range self.Entry {
+	for i, ele := range doc.Entry {
 		if ele != other.Entry[i] {
 			return false
 		}
@@ -35,11 +35,11 @@ func (self *DocInfo) EntryEqual(other *DocInfo) bool {
 	return true
 }
 
-func (self *Keyword) ToString() string {
-	if self == nil {
+func (kw *Keyword) ToString() string {
+	if kw == nil {
 		return nil_keyword
 	}
-	return self.Field + "\001" + self.Word
+	return kw.Field + "\001" + kw.Word
 }
 
 func NewKeyword(ser string) *Keyword {
@@ -99,12 +99,12 @@ func (docs ScoredDocs) topK(k int, begin int, end int) {
 	pivot := docs[begin]
 	low := begin
 	high := end - 1
-	for ; low < high; {
-		for ; low < high && !docs[high].Less(pivot); { //注意不能用pivot.Less(docs[high])，否则当有重复元素时会发生死循环
+	for low < high {
+		for low < high && !docs[high].Less(pivot) { //注意不能用pivot.Less(docs[high])，否则当有重复元素时会发生死循环
 			high--
 		}
 		docs[low] = docs[high]
-		for ; low < high && !pivot.Less(docs[low]); {
+		for low < high && !pivot.Less(docs[low]) {
 			low++
 		}
 		docs[high] = docs[low]

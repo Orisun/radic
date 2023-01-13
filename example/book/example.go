@@ -19,10 +19,10 @@ type Book struct {
 }
 
 //Serialize 图书序列化。序列化和反序列化由调用方决定，这不是radic负责的范畴。
-func (self *Book) Serialize() []byte {
+func (book *Book) Serialize() []byte {
 	var value bytes.Buffer
 	encoder := gob.NewEncoder(&value) //gob是go自带的序列化方法，当然也可以用protobuf等其它方式
-	err := encoder.Encode(self)
+	err := encoder.Encode(book)
 	if err == nil {
 		return value.Bytes()
 	} else {
@@ -118,7 +118,7 @@ func main() {
 			fmt.Printf("book name %s\n", book.Name)
 		}
 	}
-	fmt.Println()
+	fmt.Println("=======================================")
 
 	/**
 	按doc id检索
@@ -127,13 +127,12 @@ func main() {
 	book := DeserializeBook(doc.Entry)
 	fmt.Printf("book name %s\n", book.Name)
 	fmt.Printf("book keywords %v\n", doc.Keyword) //由于flag=1，所以获取不到Keyword
-	fmt.Println()
+	fmt.Println("=======================================")
 
 	/**
 	删除doc
 	*/
-	engine.RemoveDoc(book2.Id)
-	fmt.Println()
+	engine.RemoveDoc(book1.Id)
 
 	/**
 	遍历索引上的数据
@@ -143,4 +142,5 @@ func main() {
 		fmt.Printf("book name %s\n", book.Name)
 		return nil
 	})
+	fmt.Println("=======================================")
 }

@@ -63,7 +63,7 @@ type Indexer struct {
 	invertListLen *util.ConcurrentMapString //大概记录每个倒排链的长度，串行从多个倒排链取交集时先取短的
 
 	haveStatistics     bool
-	execDeleteThresh   int
+	execDeleteThresh   int       //要删除的doc累积到一定量execDeleteThresh时，才执行真正的删除操作
 	traverseResultPool sync.Pool //每次遍历倒排链时都创建一个临时数组，以容纳遍历的结果，造成GC时间较长。所以采用对象池进行优化
 }
 
@@ -310,22 +310,6 @@ func (indexer *Indexer) AddToInvertIndex(keywords []*types.Keyword, doc *types.D
 	}
 }
 
-////UpdateForwardIndex 覆盖detail
-//func (indexer *Indexer) UpdateDetail(doc *types.DocInfo) {
-//	//往正排索引上添加
-//	doc.Keyword = nil //keys和detail分开存储，因为它们的读取频率不一样
-//	var value bytes.Buffer
-//	encoder := gob.NewEncoder(&value) //gob是go自带的序列化方法
-//	if err := encoder.Encode(doc); err == nil { //由于DocInfo中的Entry是interface{}，没有指定具体的类型，所以在调用AddDoc之前需要先往gob中注册Entry的具体类型
-//		shardId1, _ := indexer.getShardId(doc.DocId)
-//		detailDB := indexer.dbs[shardId1]
-//		storageKey := indexer.getStorageKey(doc.DocId)
-//		detailDB.Set(storageKey, value.Bytes(), doc.ExpireAt)
-//	} else {
-//		log.Printf("write doc %d to db failed", doc.DocId)
-//	}
-//}
-
 func (indexer *Indexer) AddToLocalDB(doc *types.DocInfo) {
 	//往正排索引上添加
 	keys := doc.Keyword
@@ -419,7 +403,6 @@ func (indexer *Indexer) BatchIndexDoc(originDocs []*types.DocInfo) {
 	//往正排索引上添加
 	keysMap := make(map[uint64][][]byte, indexer.initOptions.DbShardNum)
 	valuesMap := make(map[uint64][][]byte, indexer.initOptions.DbShardNum)
-	expireMap := make(map[uint64][]int64, indexer.initOptions.DbShardNum)
 
 	for _, doc := range docs {
 		detailShardId, keysShardId := indexer.getShardId(doc.DocId)
@@ -433,22 +416,16 @@ func (indexer *Indexer) BatchIndexDoc(originDocs []*types.DocInfo) {
 			if keys, exists := keysMap[detailShardId]; !exists {
 				keys = make([][]byte, 0, len(docs))
 				values := make([][]byte, 0, len(docs))
-				expireAts := make([]int64, 0, len(docs))
 				keys = append(keys, storageKey)
 				values = append(values, detailWriter.Bytes())
-				expireAts = append(expireAts)
 				keysMap[detailShardId] = keys
 				valuesMap[detailShardId] = values
-				expireMap[detailShardId] = expireAts
 			} else {
 				keys = append(keys, storageKey)
 				values := valuesMap[detailShardId]
 				values = append(values, detailWriter.Bytes())
-				expireAts := expireMap[detailShardId]
-				expireAts = append(expireAts)
 				keysMap[detailShardId] = keys
 				valuesMap[detailShardId] = values
-				expireMap[detailShardId] = expireAts
 			}
 		} else {
 			log.Printf("write doc %d to db failed", doc.DocId)
@@ -460,22 +437,16 @@ func (indexer *Indexer) BatchIndexDoc(originDocs []*types.DocInfo) {
 			if keys, exists := keysMap[keysShardId]; !exists {
 				keys = make([][]byte, 0, len(docs))
 				values := make([][]byte, 0, len(docs))
-				expireAts := make([]int64, 0, len(docs))
 				keys = append(keys, storageKey)
 				values = append(values, keysWriter.Bytes())
-				expireAts = append(expireAts)
 				keysMap[keysShardId] = keys
 				valuesMap[keysShardId] = values
-				expireMap[keysShardId] = expireAts
 			} else {
 				keys = append(keys, storageKey)
 				values := valuesMap[keysShardId]
 				values = append(values, keysWriter.Bytes())
-				expireAts := expireMap[keysShardId]
-				expireAts = append(expireAts)
 				keysMap[keysShardId] = keys
 				valuesMap[keysShardId] = values
-				expireMap[keysShardId] = expireAts
 			}
 		} else {
 			log.Printf("write doc %d to db failed", doc.DocId)
@@ -503,19 +474,37 @@ func (indexer *Indexer) deleteDoc(docId uint32) {
 		log.Printf("indexer have not initialized")
 		return
 	}
+	//从docScores里删除
 	if indexer.docScores != nil {
 		indexer.docScores.Remove(docId)
 	}
 
-	//把要删除的docId存到deleteTable上
-	indexer.AddDeletePair(docId, &types.Keyword{})
 	//从正排索引上删除
 	detailShardId, keysShardId := indexer.getShardId(docId)
 	storageKey := indexer.getStorageKey(docId)
 	detailDB := indexer.dbs[detailShardId]
 	detailDB.Delete(storageKey)
 	keysDB := indexer.dbs[keysShardId]
+
+	//从正排索引上拿到doc有keywords后再【异步地】从倒排索引上删除
+	keysReader := bytes.NewReader([]byte{})
+	if keyBytes, err2 := keysDB.Get(storageKey); err2 == nil {
+		if len(keyBytes) > 0 {
+			keysReader.Reset(keyBytes)
+			keysDecoder := gob.NewDecoder(keysReader)
+			var keyDoc []*types.Keyword
+			err3 := keysDecoder.Decode(&keyDoc)
+			if err3 == nil {
+				for _, ele := range keyDoc {
+					//把要删除的docId存到deleteTable上。要删除的doc积累到一定量时才会从倒排上删除，所有经常会出现从倒排检出的结果在docScores和正排上没有，只要正排上没有，LookUp检索时就不会返回
+					indexer.AddDeletePair(docId, ele)
+				}
+			}
+		}
+	}
+
 	keysDB.Delete(storageKey)
+
 }
 
 //func (indexer *Indexer) haveBeenDeleted(docId uint32) bool {
@@ -530,15 +519,15 @@ func (indexer *Indexer) AddDeletePair(docId uint32, word *types.Keyword) {
 	indexer.taskCount.Add(1)
 	defer indexer.taskCount.Done()
 	key := strconv.FormatUint(uint64(docId), 10)
-	if list, exists := indexer.toBeDeleteBuffer.Get(key); exists {
-		value := list.(*util.ConcurrentMapString)
-		value.Set(word.ToString(), true)
+	if value, exists := indexer.toBeDeleteBuffer.Get(key); exists {
+		conmap := value.(*util.ConcurrentMapString)
+		conmap.Set(word.ToString(), true)
 	} else {
-		value := util.NewConcurrentMapString(4)
-		value.Set(word.ToString(), true)
-		indexer.toBeDeleteBuffer.Set(key, value)
+		conmap := util.NewConcurrentMapString(4)
+		conmap.Set(word.ToString(), true)
+		indexer.toBeDeleteBuffer.Set(key, conmap)
 	}
-	if indexer.toBeDeleteBuffer.Count() > indexer.execDeleteThresh { //当delete缓冲到达阈值时个keyword时，把缓冲清掉
+	if indexer.toBeDeleteBuffer.Count() > indexer.execDeleteThresh { //要删除的doc累积到一定量execDeleteThresh时，才执行真正的删除操作
 		indexer.CleanToBeDeleteBuffer()
 	}
 }
@@ -573,11 +562,11 @@ func (indexer *Indexer) Lookup(must []*types.Keyword, should []*types.Keyword, n
 	//util.Log.Debugf("must", must, "should", should)
 	t0 := time.Now()
 	haveMust := false //筛选条件里有must
-	if must != nil && len(must) > 0 {
+	if len(must) > 0 {
 		haveMust = true
 	}
 	haveshould := false //筛选条件里有should
-	if should != nil && len(should) > 0 {
+	if len(should) > 0 {
 		haveshould = true
 	}
 	if !haveMust && !haveshould { //筛选条件里既没must又没should
@@ -606,7 +595,7 @@ func (indexer *Indexer) Lookup(must []*types.Keyword, should []*types.Keyword, n
 	wg.Wait()
 
 	haveMustResult := false //根据must条件有搜索结果
-	if mustResult != nil && len(mustResult) > 0 {
+	if len(mustResult) > 0 {
 		haveMustResult = true
 	}
 	if haveMust && !haveMustResult {
@@ -614,7 +603,7 @@ func (indexer *Indexer) Lookup(must []*types.Keyword, should []*types.Keyword, n
 		return nil
 	}
 	haveshouldResult := false //根据shpuld条件有搜索结果
-	if shouldResult != nil && len(shouldResult) > 0 {
+	if len(shouldResult) > 0 {
 		haveshouldResult = true
 	}
 	if haveshould && !haveshouldResult {
@@ -676,9 +665,10 @@ func (indexer *Indexer) Lookup(must []*types.Keyword, should []*types.Keyword, n
 							RankScore: indexer.initOptions.PreRankCriteria.Score(score.(float32)),
 						}
 						ranks = append(ranks, rs)
-					} else {
-						log.Printf("can not find scores of doc %d", docId)
 					}
+					// else {
+					// log.Printf("can not find scores of doc %d", docId)
+					// }
 				}
 				ranks.TopK(indexer.initOptions.MaxRetrieve) //只需要取TopK就可以了，没必要排序
 

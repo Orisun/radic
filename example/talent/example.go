@@ -48,9 +48,8 @@ func DeserializeTalent(v []byte) *Talent {
 type ManualRankCriteria struct {
 }
 
-func (criteria ManualRankCriteria) Score(doc *types.DocInfo) float32 {
-	talent := DeserializeTalent(doc.Entry)
-	return float32(talent.Age)
+func (criteria ManualRankCriteria) Score(s float32) float32 {
+	return s
 }
 
 func main() {
@@ -65,6 +64,8 @@ func main() {
 		DbType:                "badger",
 		AddDocThreads:         8,
 		DeleteDocThreads:      4,
+		PreRankCriteria:       ManualRankCriteria{},
+		MaxRetrieve:           2, //搜索时最多返回2条结果
 	}
 	engine := radic.IndexEngine{}
 	engine.Init(options)
@@ -82,6 +83,12 @@ func main() {
 		Name:  "zcy",
 		Is211: true,
 	}
+	talent3 := Talent{
+		Id:    33333333,
+		Age:   30,
+		Name:  "朝阳",
+		Is211: true,
+	}
 	kw1 := &types.Keyword{Field: "company", Word: "百度"}
 	kw2 := &types.Keyword{Field: "skill", Word: "测试"}
 	kw3 := &types.Keyword{Field: "name", Word: talent1.Name}
@@ -91,25 +98,32 @@ func main() {
 	docInfo1 := types.DocInfo{
 		DocId:     uint32(talent1.Id),
 		Keyword:   []*types.Keyword{kw1, kw2, kw3},
-		RankScore: 2,
+		RankScore: 5,
 		Entry:     talent1.Serialize(),
 	}
 	docInfo2 := types.DocInfo{
 		DocId:     uint32(talent2.Id),
 		Keyword:   []*types.Keyword{kw1, kw4, kw5, kw6},
-		RankScore: 3,
+		RankScore: 8,
 		Entry:     talent2.Serialize(),
+	}
+	docInfo3 := types.DocInfo{
+		DocId:     uint32(talent3.Id),
+		Keyword:   []*types.Keyword{kw1, kw4, kw5, kw6},
+		RankScore: 9,
+		Entry:     talent3.Serialize(),
 	}
 	engine.IndexDoc(docInfo1) //往索引上添加数据是异步执行的
 	engine.IndexDoc(docInfo2)
-	time.Sleep(100 * time.Millisecond) //稍等一会儿，等Add操作执行完成
-	//engine.InvertIndexStatistics("")	建好索引后最好调用一次InvertIndexStatistics，有利于搜索速度的提升
+	engine.IndexDoc(docInfo3)
+	time.Sleep(100 * time.Millisecond)      //稍等一会儿，等Add操作执行完成
+	engine.InvertIndexStatistics("sta.txt") //建好索引后最好调用一次InvertIndexStatistics，有利于搜索速度的提升
 
-	doc := engine.GetDoc(talent1.Id, 1)
+	doc := engine.GetDoc(talent1.Id, 1) //仅获取detail
 	t2 := DeserializeTalent(doc.Entry)
 	fmt.Printf("name of talent %d is %s, keywords %v\n", talent1.Id, t2.Name, doc.Keyword)
 	fmt.Println("================================")
-	doc = engine.GetDoc(talent1.Id, 0)
+	doc = engine.GetDoc(talent1.Id, 0) //获取detail和keywords
 	t2 = DeserializeTalent(doc.Entry)
 	fmt.Printf("name of talent %d is %s, keywords %v\n", talent1.Id, t2.Name, doc.Keyword)
 	fmt.Println("================================")
@@ -142,7 +156,7 @@ func main() {
 	if !response.Timeout {
 		fmt.Printf("一共有%d条搜索结果\n", response.Total)
 		for _, doc := range response.Docs {
-			fmt.Println(doc)
+			// fmt.Println(doc)
 			//fmt.Println(doc.HitKeywords)
 			talent := DeserializeTalent(doc)
 			fmt.Printf("name of talent %d is %s\n", talent.Id, talent.Name)

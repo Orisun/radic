@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	defaultIndexName             = "github.com/Orisun/radic"
+	defaultIndexName             = "radic"
 	defaultAddCacheSize          = 10000
 	defaultDeleteCacheSize       = 1000
 	defaultInvertIndexSegmentNum = 32
@@ -24,10 +24,6 @@ var (
 	defaultAddDocThreads    = runtime.NumCPU()
 	defaultDeleteDocThreads = runtime.NumCPU() / 2
 )
-
-type RankCriteria interface {
-	Score(*DocInfo) float32
-}
 
 type PreRankCriteria interface {
 	Score(float32) float32
