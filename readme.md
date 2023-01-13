@@ -2,6 +2,8 @@ go语言实现搜索引擎的索引部分，包括：<br>
 [倒排索引](inverted_index/readme.md)<br>
 [正排索引](forward_index/readme.md)<br>
 [分布式索引](distributed/readme.md)<br>
+<br>
+我专门在腾讯课堂上开了门长达16小时的视频课堂：[《用Go实现工业级搜索引擎》](https://ke.qq.com/course/3617680)<br>
 
 ### 使用举例
 ```gotemplate
