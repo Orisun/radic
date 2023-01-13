@@ -1,10 +1,12 @@
+// Date         : 2018/7/2 下午2:19
+// Author       : zhangchaoyang
+// Description  :provides an in memory LRU cache with TTL support.
 package inmem
 
-
 import (
-"container/list"
-"sync"
-"time"
+	"container/list"
+	"sync"
+	"time"
 )
 
 // Cache of things.

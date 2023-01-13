@@ -1,4 +1,7 @@
-package inverted_index
+// Date         : 2018/7/28
+// Author       : zhangchaoyang
+// Description  :
+package core
 
 import (
 	"bufio"
@@ -6,11 +9,10 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"fmt"
-	"github.com/cespare/xxhash"
 	"math"
 	"os"
 	"path"
-	"radic/forward_index"
+	storage "radic/forward_index"
 	"radic/types"
 	"radic/util"
 	"radic/util/inmem"
@@ -19,11 +21,15 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"log"
+
+	"github.com/cespare/xxhash"
 )
 
 const (
 	BATCH_DELETE_PERSENT = 1e-3 //待删文章占总文档数的BATCH_DELETE_PERSENT时才真正从倒排链上删除
-	INVERTED_SEG_LEN     = 5E4  //多协程并行遍历倒排链，一个负责遍历INVERTED_SEG_LEN个元素
+	INVERTED_SEG_LEN     = 5e4  //多协程并行遍历倒排链，一个负责遍历INVERTED_SEG_LEN个元素
 )
 
 var (
@@ -42,7 +48,7 @@ type Indexer struct {
 	totalDocs          uint64 //一共索引了多少文档
 	initOptions        types.IndexerOpts
 	initialized        bool //是否已调用过Init函数
-	
+
 	addChannel         chan types.DocInfo //从此channel取出数据，从正排索引和倒排索引上将对应的doc删掉
 	deleteChannel      chan uint32        //从此channel取出数据，从正排索引上将对应的doc删掉
 	shutDown           chan bool          //通知add和delete子协和退出
@@ -51,11 +57,10 @@ type Indexer struct {
 	delRoutineFinished sync.WaitGroup
 	toBeDeleteBuffer   *util.ConcurrentMapString //从倒排索引上检出数据后，如果发现在这个集合里，则从倒排索引上删掉。sync.Map是go1.9中新加入的线程安全的map，性能没有ConcurrentMap高
 	docScores          *util.ConcurrentMapUint32
-	metricTag          map[string]string
-	
+
 	taskCount     sync.WaitGroup
 	invertListLen *util.ConcurrentMapString //大概记录每个倒排链的长度，串行从多个倒排链取交集时先取短的
-	
+
 	haveStatistics     bool
 	execDeleteThresh   int
 	traverseResultPool sync.Pool //每次遍历倒排链时都创建一个临时数组，以容纳遍历的结果，造成GC时间较长。所以采用对象池进行优化
@@ -64,21 +69,21 @@ type Indexer struct {
 //Close 关闭local db，释放倒排索引所占的内存
 func (indexer *Indexer) Close() {
 	if !indexer.initialized {
-		util.Log.Printf("indexer have not initialized")
+		fmt.Println("indexer have not initialized")
 		return
 	}
-	
+
 	indexer.stoped = true
 	indexer.shutDown <- true
 	runtime.Gosched()
 	indexer.taskCount.Wait() //等正在执行的工作结束
-	util.Log.Printf("all task of indexer stoped")
+	log.Printf("all task of indexer stoped")
 	//等两组子协程结束
 	indexer.addRoutineFinished.Wait()
-	util.Log.Printf("add doc routines finished")
+	log.Printf("add doc routines finished")
 	indexer.delRoutineFinished.Wait()
-	util.Log.Printf("delete doc routines finished")
-	
+	log.Printf("delete doc routines finished")
+
 	close(indexer.addChannel)
 	close(indexer.deleteChannel)
 	indexer.invertedTables = nil
@@ -86,14 +91,13 @@ func (indexer *Indexer) Close() {
 	indexer.toBeDeleteBuffer = nil //从map中delete key根本不会释放内存，只能设为nil，静待GC
 	indexer.docScores = nil
 	runtime.GC()
-	
+
 	for _, db := range indexer.dbs {
 		if err := db.Close(); err != nil {
-			util.Log.Printf("close local db failed: %v", err)
+			log.Fatalf("close local db failed: %v", err)
 		}
 	}
-	util.Log.Printf("close all local db")
-	
+	log.Printf("close all local db")
 }
 
 //Init 初始化参数
@@ -101,11 +105,9 @@ func (indexer *Indexer) Init(options types.IndexerOpts) {
 	if indexer.initialized {
 		return
 	}
-	
+
 	options.Init()
-	indexer.metricTag = make(map[string]string)
-	indexer.metricTag["index"] = options.IndexName
-	
+
 	indexer.initOptions = options
 	indexer.invertedTables = make([]map[string][]uint64, options.InvertIndexSegmentNum)
 	indexer.invertedTableLocks = make([]sync.RWMutex, options.InvertIndexSegmentNum)
@@ -128,17 +130,19 @@ func (indexer *Indexer) Init(options types.IndexerOpts) {
 		}
 	}
 	indexer.initialized = true
-	
+
 	indexer.addChannel = make(chan types.DocInfo, options.AddCacheSize)
-	indexer.deleteChannel = make(chan uint32, options.AddCacheSize)
+	indexer.deleteChannel = make(chan uint32, options.DeleteCacheSize)
 	indexer.toBeDeleteBuffer = util.NewConcurrentMapString(8)
+	if indexer.initOptions.PreRankCriteria != nil { //如果没有指定PreRankCriteria，则不需要用到indexer.docScores缓存
 		indexer.docScores = util.NewConcurrentMapUint32(32)
+	}
 	indexer.shutDown = make(chan bool, 2*(options.AddDocThreads+options.DeleteDocThreads))
 	indexer.addRoutineFinished = sync.WaitGroup{}
 	indexer.addRoutineFinished.Add(options.AddDocThreads)
 	indexer.delRoutineFinished = sync.WaitGroup{}
 	indexer.delRoutineFinished.Add(options.DeleteDocThreads)
-	
+
 	indexer.taskCount = sync.WaitGroup{}
 	indexer.invertListLen = util.NewConcurrentMapString(64)
 	indexer.execDeleteThresh = 1000
@@ -148,13 +152,13 @@ func (indexer *Indexer) Init(options types.IndexerOpts) {
 			return brr
 		},
 	}
-	
+
 	//启动addDoc的消费线程
 	for i := 0; i < options.AddDocThreads; i++ {
 		go func() {
 			defer indexer.addRoutineFinished.Done()
 			stop := false
-			for ; !stop; {
+			for !stop {
 				select {
 				case doc := <-indexer.addChannel: //如果addChannel已空，该行代码会一直阻塞，所以放在select里通过shutDown这个管道来强制它退出
 					indexer.addDoc(doc)
@@ -165,13 +169,13 @@ func (indexer *Indexer) Init(options types.IndexerOpts) {
 			}
 		}()
 	}
-	
+
 	//启动deleteDoc的消费线程
 	for i := 0; i < options.DeleteDocThreads; i++ {
 		go func() {
 			defer indexer.delRoutineFinished.Done()
 			stop := false
-			for ; !stop; {
+			for !stop {
 				select {
 				case docId := <-indexer.deleteChannel: //如果deleteChannel已空，该行代码会一直阻塞，所以放在select里通过shutDown这个管道来强制它退出
 					indexer.deleteDoc(docId)
@@ -233,7 +237,7 @@ func (indexer *Indexer) IterIndex(fn func(docId uint32, docInfo types.DocInfo) e
 				fn(data.DocId, data)
 			}
 			return nil
-		});
+		})
 	}
 }
 
@@ -249,7 +253,7 @@ func (indexer *Indexer) IterKeyOnIndex(fn func(docId uint32) error) error {
 		db.IterKey(func(k []byte) error {
 			fn(indexer.storageKey2DocId(k))
 			return nil
-		});
+		})
 	}
 	return rect
 }
@@ -271,7 +275,7 @@ func (indexer *Indexer) addDoc(doc types.DocInfo) {
 
 func (indexer *Indexer) addDocInner(doc types.DocInfo, Insert2Storage bool) {
 	if !indexer.initialized {
-		util.Log.Printf("indexer have not initialized")
+		log.Printf("indexer have not initialized")
 		return
 	}
 	if indexer.docScores != nil {
@@ -279,7 +283,7 @@ func (indexer *Indexer) addDocInner(doc types.DocInfo, Insert2Storage bool) {
 	}
 	//往倒排索引上添加
 	indexer.AddToInvertIndex(doc.Keyword, &doc)
-	
+
 	if Insert2Storage {
 		//往正排索引上添加
 		indexer.AddToLocalDB(&doc)
@@ -288,7 +292,7 @@ func (indexer *Indexer) addDocInner(doc types.DocInfo, Insert2Storage bool) {
 
 func (indexer *Indexer) AddToInvertIndex(keywords []*types.Keyword, doc *types.DocInfo) {
 	if !indexer.initialized {
-		util.Log.Printf("indexer have not initialized")
+		log.Printf("indexer have not initialized")
 		return
 	}
 	for _, keyword := range keywords {
@@ -305,18 +309,34 @@ func (indexer *Indexer) AddToInvertIndex(keywords []*types.Keyword, doc *types.D
 	}
 }
 
+////UpdateForwardIndex 覆盖detail
+//func (indexer *Indexer) UpdateDetail(doc *types.DocInfo) {
+//	//往正排索引上添加
+//	doc.Keyword = nil //keys和detail分开存储，因为它们的读取频率不一样
+//	var value bytes.Buffer
+//	encoder := gob.NewEncoder(&value) //gob是go自带的序列化方法
+//	if err := encoder.Encode(doc); err == nil { //由于DocInfo中的Entry是interface{}，没有指定具体的类型，所以在调用AddDoc之前需要先往gob中注册Entry的具体类型
+//		shardId1, _ := indexer.getShardId(doc.DocId)
+//		detailDB := indexer.dbs[shardId1]
+//		storageKey := indexer.getStorageKey(doc.DocId)
+//		detailDB.Set(storageKey, value.Bytes(), doc.ExpireAt)
+//	} else {
+//		log.Printf("write doc %d to db failed", doc.DocId)
+//	}
+//}
+
 func (indexer *Indexer) AddToLocalDB(doc *types.DocInfo) {
 	//往正排索引上添加
 	keys := doc.Keyword
 	doc.Keyword = nil //keys和detail分开存储，因为它们的读取频率不一样
 	var value bytes.Buffer
-	encoder := gob.NewEncoder(&value) //gob是go自带的序列化方法
+	encoder := gob.NewEncoder(&value)           //gob是go自带的序列化方法
 	if err := encoder.Encode(doc); err == nil { //由于DocInfo中的Entry是interface{}，没有指定具体的类型，所以在调用AddDoc之前需要先往gob中注册Entry的具体类型
 		shardId1, shardId2 := indexer.getShardId(doc.DocId)
 		detailDB := indexer.dbs[shardId1]
 		storageKey := indexer.getStorageKey(doc.DocId)
 		detailDB.Set(storageKey, value.Bytes())
-		
+
 		var value2 bytes.Buffer
 		encoder2 := gob.NewEncoder(&value2)
 		if err := encoder2.Encode(keys); err == nil {
@@ -325,11 +345,11 @@ func (indexer *Indexer) AddToLocalDB(doc *types.DocInfo) {
 		}
 		atomic.AddUint64(&indexer.totalDocs, 1)
 	} else {
-		util.Log.Printf("write doc %d to db failed", doc.DocId)
+		log.Printf("write doc %d to db failed", doc.DocId)
 	}
 }
 
-//DocNum 索引中的文档总数
+//DocNum 索引中的文档总数。若indexer.initOptions.PreRankCriteria为nil，则返回-1
 func (indexer *Indexer) DocNum() int {
 	if indexer.stoped {
 		return 0
@@ -352,10 +372,10 @@ func (indexer *Indexer) BatchIndexDoc(originDocs []*types.DocInfo) {
 	indexer.taskCount.Add(1)
 	defer indexer.taskCount.Done()
 	if !indexer.initialized {
-		util.Log.Printf("indexer have not initialized")
+		log.Printf("indexer have not initialized")
 		return
 	}
-	
+
 	//先深拷贝一份
 	docs := append(make([]*types.DocInfo, 0, len(originDocs)), originDocs...)
 	//往倒排索引上添加
@@ -365,6 +385,7 @@ func (indexer *Indexer) BatchIndexDoc(originDocs []*types.DocInfo) {
 			indexer.docScores.Set(doc.DocId, doc.RankScore)
 		}
 		queue <- doc
+		//util.Log.Debugf("add %d to queue, keyword len %d", doc.DocId,len(doc.Keyword))
 	}
 	close(queue)
 	//并行写倒排索引
@@ -375,6 +396,7 @@ func (indexer *Indexer) BatchIndexDoc(originDocs []*types.DocInfo) {
 			defer writeInvertWg.Done()
 			for doc := range queue { //多线程并行去消费这个queue
 				keywords := doc.Keyword
+				//util.Log.Debugf("key word len is %d of doc %d", len(keywords), doc.DocId)
 				for _, keyword := range keywords {
 					k := keyword.ToString()
 					indexId := indexer.getIndexId(k)
@@ -385,24 +407,25 @@ func (indexer *Indexer) BatchIndexDoc(originDocs []*types.DocInfo) {
 					} else {
 						invertedTable[k] = []uint64{CombineDocidAndFlag(doc.DocId, doc.CompositeFeature)}
 					}
+					//util.Log.Debugf("add %d to invert list of key %s", doc.DocId, k)
 					indexer.invertedTableLocks[indexId].Unlock()
 				}
 			}
 		}()
 	}
 	writeInvertWg.Wait() //等待写倒排索引的任务结束
-	
+
 	//往正排索引上添加
 	keysMap := make(map[uint64][][]byte, indexer.initOptions.DbShardNum)
 	valuesMap := make(map[uint64][][]byte, indexer.initOptions.DbShardNum)
 	expireMap := make(map[uint64][]int64, indexer.initOptions.DbShardNum)
-	
+
 	for _, doc := range docs {
 		detailShardId, keysShardId := indexer.getShardId(doc.DocId)
 		keys := doc.Keyword
 		doc.Keyword = nil
 		storageKey := indexer.getStorageKey(doc.DocId)
-		
+
 		var detailWriter bytes.Buffer
 		detailEncoder := gob.NewEncoder(&detailWriter)
 		if err := detailEncoder.Encode(doc); err == nil {
@@ -427,9 +450,9 @@ func (indexer *Indexer) BatchIndexDoc(originDocs []*types.DocInfo) {
 				expireMap[detailShardId] = expireAts
 			}
 		} else {
-			util.Log.Printf("write doc %d to db failed", doc.DocId)
+			log.Printf("write doc %d to db failed", doc.DocId)
 		}
-		
+
 		var keysWriter bytes.Buffer
 		keysEncoder := gob.NewEncoder(&keysWriter)
 		if err := keysEncoder.Encode(keys); err == nil {
@@ -454,14 +477,14 @@ func (indexer *Indexer) BatchIndexDoc(originDocs []*types.DocInfo) {
 				expireMap[keysShardId] = expireAts
 			}
 		} else {
-			util.Log.Printf("write doc %d to db failed", doc.DocId)
+			log.Printf("write doc %d to db failed", doc.DocId)
 		}
 	}
-	
+
 	//并行写本地db
 	wg := sync.WaitGroup{}
 	wg.Add(len(keysMap))
-	for shardId, _ := range keysMap {
+	for shardId := range keysMap {
 		go func(shardId uint64) { //注意：在子协程中使用for range生成的变量时一定作为参数传给子协程
 			defer wg.Done()
 			db := indexer.dbs[shardId]
@@ -476,13 +499,13 @@ func (indexer *Indexer) BatchIndexDoc(originDocs []*types.DocInfo) {
 
 func (indexer *Indexer) deleteDoc(docId uint32) {
 	if !indexer.initialized {
-		util.Log.Printf("indexer have not initialized")
+		log.Printf("indexer have not initialized")
 		return
 	}
 	if indexer.docScores != nil {
 		indexer.docScores.Remove(docId)
 	}
-	
+
 	//把要删除的docId存到deleteTable上
 	indexer.AddDeletePair(docId, &types.Keyword{})
 	//从正排索引上删除
@@ -493,6 +516,10 @@ func (indexer *Indexer) deleteDoc(docId uint32) {
 	keysDB := indexer.dbs[keysShardId]
 	keysDB.Delete(storageKey)
 }
+
+//func (indexer *Indexer) haveBeenDeleted(docId uint32) bool {
+//	return indexer.toBeDeleteBuffer.Has(strconv.FormatUint(uint64(docId), 10))
+//}
 
 //AddDeletePair 从倒排索引的一个key上把指定docID删掉。这是异步执行的，积累到一定量才会真正执行
 func (indexer *Indexer) AddDeletePair(docId uint32, word *types.Keyword) {
@@ -542,6 +569,7 @@ func (indexer *Indexer) Lookup(must []*types.Keyword, should []*types.Keyword, n
 	}
 	indexer.taskCount.Add(1)
 	defer indexer.taskCount.Done()
+	//util.Log.Debugf("must", must, "should", should)
 	t0 := time.Now()
 	haveMust := false //筛选条件里有must
 	if must != nil && len(must) > 0 {
@@ -552,13 +580,14 @@ func (indexer *Indexer) Lookup(must []*types.Keyword, should []*types.Keyword, n
 		haveshould = true
 	}
 	if !haveMust && !haveshould { //筛选条件里既没must又没should
+		//util.Log.Debugf("not haveMust and not haveshould")
 		return nil
 	}
-	
+
 	var mustResult map[uint32]bool
 	var shouldResult map[uint32]bool
 	var notResult map[uint32]bool
-	
+
 	wg := sync.WaitGroup{}
 	wg.Add(3)
 	go func() {
@@ -574,12 +603,13 @@ func (indexer *Indexer) Lookup(must []*types.Keyword, should []*types.Keyword, n
 		shouldResult = indexer.shouldFind(should, filterIds, onFlag, offFlag, orFlags) //should：只需要命中一个关键词
 	}()
 	wg.Wait()
-	
+
 	haveMustResult := false //根据must条件有搜索结果
 	if mustResult != nil && len(mustResult) > 0 {
 		haveMustResult = true
 	}
 	if haveMust && !haveMustResult {
+		//util.Log.Debugf("have not must result")
 		return nil
 	}
 	haveshouldResult := false //根据shpuld条件有搜索结果
@@ -587,14 +617,18 @@ func (indexer *Indexer) Lookup(must []*types.Keyword, should []*types.Keyword, n
 		haveshouldResult = true
 	}
 	if haveshould && !haveshouldResult {
+		//util.Log.Debugf("have not should result")
 		return nil
 	}
-	
+
+	//t1 := time.Now()
+	//util.Log.Debugf("retrieve", t1.Sub(t0).Nanoseconds())
+
 	var intersect map[uint32]bool
-	
+
 	if haveMust && haveshould {
 		intersect = make(map[uint32]bool, len(mustResult))
-		for k, _ := range mustResult {
+		for k := range mustResult {
 			if shouldResult[k] {
 				intersect[k] = true
 			}
@@ -604,41 +638,49 @@ func (indexer *Indexer) Lookup(must []*types.Keyword, should []*types.Keyword, n
 	} else if haveshould {
 		intersect = shouldResult
 	}
-	
+
+	//t2 := time.Now()
+	//util.Log.Debugf("intersect", t2.Sub(t1).Nanoseconds())
+
 	if len(intersect) > 0 {
 		filterDocIds := make(map[uint32]bool, len(notResult)) //如果notResult是nil，则len(notResult)返回0
-		
+
 		if len(notResult) > 0 {
 			for k := range notResult {
 				filterDocIds[k] = true
+				//util.Log.Debugf("add %d to filterDocIds", k)
 			}
 		}
-		
+
 		idList := make([]uint32, 0, len(intersect))
-		for docId, _ := range intersect {
+		for docId := range intersect {
+			//util.Log.Debugf("deal %d", docId)
 			if !filterDocIds[docId] {
 				idList = append(idList, docId)
 			}
 		}
-		
+
+		//t3 := time.Now()
+		//util.Log.Debugf("filter", t3.Sub(t2).Nanoseconds())
+
 		//量太大，到search层精排序容易超时，强制截断，同时也减小了网络开销
 		if len(idList) > indexer.initOptions.MaxRetrieve {
-			if indexer.docScores != nil {
-				//截断前要先按RankScore排序，保证截取的是得分最高的那一部分
+			if indexer.docScores != nil && indexer.initOptions.PreRankCriteria != nil {
+				//截断前要先按preScore排序，保证截取的是得分最高的那一部分
 				ranks := make(types.ScoredDocs, 0, len(intersect))
 				for _, docId := range idList {
 					if score, e2 := indexer.docScores.Get(docId); e2 {
 						rs := types.ScoredDoc{
 							DocId:     docId,
-							RankScore: score.(float32),
+							RankScore: indexer.initOptions.PreRankCriteria.Score(score.(float32)),
 						}
 						ranks = append(ranks, rs)
 					} else {
-						util.Log.Printf("can not find scores of doc %d", docId)
+						log.Printf("can not find scores of doc %d", docId)
 					}
 				}
-				ranks.TopK(indexer.initOptions.MaxRetrieve) //只需要取RankScore最大的前K个就可以了，没必要排序
-				
+				ranks.TopK(indexer.initOptions.MaxRetrieve) //只需要取TopK就可以了，没必要排序
+
 				minLen := indexer.initOptions.MaxRetrieve
 				if len(ranks) < minLen {
 					minLen = len(ranks)
@@ -647,13 +689,14 @@ func (indexer *Indexer) Lookup(must []*types.Keyword, should []*types.Keyword, n
 				for i := 0; i < minLen; i++ {
 					idList[i] = ranks[i].DocId
 				}
+				//util.Log.Debugf("original have %d results, truncate to size %d", len(ranks), len(idList))
 			} else {
 				idList = idList[0:indexer.initOptions.MaxRetrieve] //截断，只取前MaxRetrieve个。不需要申请额外的内存空间
 			}
 		}
 		//从正排索引上取数据
 		docInfos := indexer.GetDocs(idList)
-		
+
 		ut := time.Since(t0).Nanoseconds() / 1e6
 		if ut > 300 { //超过300ms打warn日志
 			mustLog := make([]string, 0, len(must))
@@ -664,7 +707,7 @@ func (indexer *Indexer) Lookup(must []*types.Keyword, should []*types.Keyword, n
 			for _, m := range should {
 				shouldLog = append(shouldLog, m.ToString())
 			}
-			util.Log.Printf("find for must %s should %s use time %d milliseconds", mustLog, shouldLog, ut)
+			log.Printf("find for must %s should %s use time %d milliseconds", mustLog, shouldLog, ut)
 		}
 		return docInfos
 	} else {
@@ -711,14 +754,14 @@ func (indexer *Indexer) mustFind(words []*types.Keyword, filterIds map[uint32]bo
 	if len(words) == 0 {
 		return nil
 	}
-	
+
 	begin := time.Now()
 	/**
 	多协程并发读slice或map都是OK的。
 	多协程并发读写slice不会报错，但是如果不加锁可能会导致数据不一致；多协程并发读写map程序会报错fatal error: concurrent map writes。
 	为什么slice允许并发读写，而map不允许呢？因为slice中的每个元素都有确定的地址（头指针加偏移量），而map中某个key下的value其地址是不固定的。
 	有固定地址的称为variable，多协程并发读写是允许的。array、slice、struct中的每个元素（或成员变量）都可以被独立地addressed，都是variable。
-	 */
+	*/
 	results := make([][]uint32, len(words))
 	wg := sync.WaitGroup{}
 	wg.Add(len(words))
@@ -743,7 +786,7 @@ func (indexer *Indexer) mustFind(words []*types.Keyword, filterIds map[uint32]bo
 		}(word, i) //range产生的参数一定要按值传到routine里面去，因为range每轮迭代使用的是同一个地址
 	}
 	wg.Wait()
-	
+
 	if shortestListLen == math.MaxInt32 {
 		return map[uint32]bool{}
 	}
@@ -757,7 +800,7 @@ func (indexer *Indexer) mustFind(words []*types.Keyword, filterIds map[uint32]bo
 		hitCountMap[ele] = 1
 	}
 	indexer.traverseResultPool.Put(arr) //读完后归还给traverseResultPool
-	
+
 	//再遍历其余的，增加hitCountMap中的计数
 	for i, arr := range results {
 		if arr == nil || i == shortestListIndex {
@@ -777,7 +820,7 @@ func (indexer *Indexer) mustFind(words []*types.Keyword, filterIds map[uint32]bo
 		}
 		indexer.traverseResultPool.Put(arr) //读完后归还给traverseResultPool
 	}
-	
+
 	rect := make(map[uint32]bool, len(hitCountMap))
 	for docId, cnt := range hitCountMap {
 		if cnt >= len(words) {
@@ -786,14 +829,14 @@ func (indexer *Indexer) mustFind(words []*types.Keyword, filterIds map[uint32]bo
 			}
 		}
 	}
-	
+
 	ut := time.Since(begin).Nanoseconds() / 1e6
 	if ut > 100 { //超过100ms打warn日志
 		mustLog := make([]string, 0, len(words))
 		for _, m := range words {
 			mustLog = append(mustLog, m.ToString())
 		}
-		util.Log.Printf("must find for %s use time %d milliseconds", mustLog, ut)
+		log.Printf("must find for %s use time %d milliseconds", mustLog, ut)
 	}
 	return rect
 }
@@ -843,7 +886,7 @@ func (indexer *Indexer) shouldFind(words []*types.Keyword, filterIds map[uint32]
 	if len(words) == 0 {
 		return nil
 	}
-	
+
 	begin := time.Now()
 	results := make([][]uint32, len(words))
 	wg := sync.WaitGroup{}
@@ -865,7 +908,7 @@ func (indexer *Indexer) shouldFind(words []*types.Keyword, filterIds map[uint32]
 		}(word, i) //range产生的参数一定要按值传到routine里面去，因为range每轮迭代使用的是同一个地址
 	}
 	wg.Wait()
-	
+
 	rect := make(map[uint32]bool, atomic.LoadInt32(&total))
 	for _, arr := range results {
 		if arr == nil {
@@ -881,16 +924,16 @@ func (indexer *Indexer) shouldFind(words []*types.Keyword, filterIds map[uint32]
 		}
 		indexer.traverseResultPool.Put(arr) //读完后归还给traverseResultPool
 	}
-	
+
 	ut := time.Since(begin).Nanoseconds() / 1e6
 	if ut > 100 { //超过100ms打warn日志
 		mustLog := make([]string, 0, len(words))
 		for _, m := range words {
 			mustLog = append(mustLog, m.ToString())
 		}
-		util.Log.Printf("should find for %s use time %d milliseconds", mustLog, ut)
+		log.Printf("should find for %s use time %d milliseconds", mustLog, ut)
 	}
-	
+
 	return rect
 }
 
@@ -922,15 +965,16 @@ func (indexer *Indexer) CleanToBeDeleteBuffer() {
 				}
 			})
 		}
-		
+
 	})
-	
+
 	wg := sync.WaitGroup{}
 	wg.Add(len(keyWordDocMap))
 	for word, docMap := range keyWordDocMap {
 		key := word.ToString()
 		go func(key string, docMap map[uint32]bool) { //注意：在子协程中使用for range生成的变量时一定作为参数传给子协程
 			defer wg.Done()
+			//util.Log.Debugf("%d doc indexed by keyword %s %v\n",len(docMap),key,docMap)
 			indexId := indexer.getIndexId(key)
 			invertedTable := indexer.invertedTables[indexId]
 			indexer.invertedTableLocks[indexId].RLock()
@@ -953,7 +997,7 @@ func (indexer *Indexer) CleanToBeDeleteBuffer() {
 		}(key, docMap)
 	}
 	wg.Wait()
-	
+
 	for _, docId := range docIdList {
 		key := strconv.FormatUint(uint64(docId), 10)
 		indexer.toBeDeleteBuffer.Remove(key)
@@ -1033,7 +1077,7 @@ func (indexer *Indexer) GetDocs(docIds []uint32) []*types.DocInfo {
 			}
 		}
 	}
-	
+
 	if len(remain) > 0 {
 		//从各个db中并行读取
 		queue := make(chan *types.DocInfo, len(docIds)-len(rect))
@@ -1064,14 +1108,14 @@ func (indexer *Indexer) GetDocs(docIds []uint32) []*types.DocInfo {
 			}(shardId, docIdList) //range产生的参数一定要按值传到routine里面去，因为range每轮迭代使用的是同一个地址
 		}
 		wg.Wait()
-		
+
 		close(queue) //把channel关闭后就可以无阻塞地遍历channel了
-		
+
 		for ele := range queue {
 			rect = append(rect, ele)
 		}
 	}
-	
+
 	return rect
 }
 
@@ -1105,26 +1149,28 @@ func (indexer *Indexer) LoadDataFromDb2InvertIndex() int {
 							indexer.addDocInner(data, false)
 							atomic.AddInt32(&total, 1)
 							if atomic.LoadInt32(&total)%100000 == 0 {
-								util.Log.Printf("load %d docs from local db to inverted index", atomic.LoadInt32(&total))
+								log.Printf("load %d docs from local db to inverted index", atomic.LoadInt32(&total))
 							}
 						} else {
-							util.Log.Printf("decode key doc of %d failed", data.DocId)
+							log.Printf("decode key doc of %d failed", data.DocId)
 						}
 					} else {
-						util.Log.Printf("keys of %d not in local db", data.DocId)
+						log.Printf("keys of %d not in local db", data.DocId)
 					}
 				} else {
-					util.Log.Printf("keys of %d not in local db", data.DocId)
+					log.Printf("keys of %d not in local db", data.DocId)
 				}
 			} else {
-				util.Log.Printf("decode detail doc failed")
+				log.Printf("decode detail doc failed")
 			}
 			return err
 		})
 	}
-	
+
+	//indexer.duplicateInvertList()
+
 	indexer.InvertIndexStatistics("")
-	
+
 	t := int(atomic.LoadInt32(&total))
 	indexer.execDeleteThresh = int(float64(t) * BATCH_DELETE_PERSENT)
 	return t
@@ -1166,29 +1212,31 @@ func (indexer *Indexer) QuickLoadDataFromDb2InvertIndex() int {
 								indexer.addDocInner(data, false)
 								atomic.AddInt32(&total, 1)
 								if atomic.LoadInt32(&total)%100000 == 0 {
-									util.Log.Printf("load %d docs from local db to inverted index", atomic.LoadInt32(&total))
+									log.Printf("load %d docs from local db to inverted index", atomic.LoadInt32(&total))
 								}
 							} else {
-								util.Log.Printf("decode key doc of %d failed", data.DocId)
+								log.Printf("decode key doc of %d failed", data.DocId)
 							}
 						} else {
-							util.Log.Printf("keys of %d not in local db", data.DocId)
+							log.Printf("keys of %d not in local db", data.DocId)
 						}
 					} else {
-						util.Log.Printf("keys of %d not in local db", data.DocId)
+						log.Printf("keys of %d not in local db", data.DocId)
 					}
 				} else {
-					util.Log.Printf("decode detail doc failed")
+					log.Printf("decode detail doc failed")
 				}
 				return err
 			})
-			util.Log.Printf("%d docs in %d db", cnt, i)
+			log.Printf("%d docs in %d db", cnt, i)
 		}(i)
 	}
 	wg.Wait()
-	
+
+	//indexer.duplicateInvertList()
+
 	indexer.InvertIndexStatistics("")
-	
+
 	t := int(atomic.LoadInt32(&total))
 	indexer.execDeleteThresh = int(float64(t) * BATCH_DELETE_PERSENT)
 	return t
@@ -1210,20 +1258,16 @@ func (indexer *Indexer) InvertIndexStatistics(outfile string) int {
 			indexer.invertListLen.Set(kw, len(arr))
 			if len(arr) > indexer.initOptions.MaxInvertListLen {
 				LongListCount++
-				util.Log.Printf("key %s inverted list len %d", kw, len(arr))
+				log.Printf("key %s inverted list len %d", kw, len(arr))
 			}
-			
+
 		}
 		indexer.invertedTableLocks[idx].RUnlock()
 	}
 	indexer.haveStatistics = true
-	
-	if KeywordCount < 10000 {
-		util.Log.Printf("%d invert list, %d length more than %d", KeywordCount, LongListCount, indexer.initOptions.MaxInvertListLen)
-	} else {
-		util.Log.Printf("%d invert list, %d length more than %d", KeywordCount, LongListCount, indexer.initOptions.MaxInvertListLen)
-	}
-	
+
+	log.Printf("一共%d条倒排链, 其中%d条长度超过了上限%d", KeywordCount, LongListCount, indexer.initOptions.MaxInvertListLen)
+
 	if outfile != "" {
 		os.Remove(outfile)
 		f_out, err := os.OpenFile(outfile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
@@ -1239,3 +1283,31 @@ func (indexer *Indexer) InvertIndexStatistics(outfile string) int {
 	}
 	return KeywordCount
 }
+
+//duplicateInvertList 每条倒排链上存在重复的docid，这里进行去重
+//func (indexer *Indexer) duplicateInvertList() {
+//	util.Log.Infof("begin duplicate invert list")
+//	begin := time.Now()
+//	wg := sync.WaitGroup{}
+//	wg.Add(len(indexer.invertedTables))
+//	for idx, table := range indexer.invertedTables {
+//		go func(idx int, table map[string][]uint32) {
+//			defer wg.Done()
+//			indexer.invertedTableLocks[idx].Lock()
+//			for kw, arr := range table { //一边遍历map，一边修改value
+//				dup := make(map[uint32]bool)
+//				for _, ele := range arr {
+//					dup[ele] = true
+//				}
+//				newList := make([]uint32, len(dup))
+//				for k, _ := range dup {
+//					newList = append(newList, k)
+//				}
+//				table[kw] = newList
+//			}
+//			indexer.invertedTableLocks[idx].Unlock()
+//		}(idx, table)
+//	}
+//	wg.Wait()
+//	util.Log.Infof("duplicate invert list use time {} seconds", time.Since(begin).Seconds())
+//}

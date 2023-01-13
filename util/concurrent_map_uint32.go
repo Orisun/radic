@@ -1,3 +1,7 @@
+// Date         : 2019-04-13 19:52
+// Author       : zhangzhaoyang
+// Description  :
+
 package util
 
 import (
@@ -14,7 +18,7 @@ type ConcurrentMapUint32 struct {
 
 // A "thread" safe uint32 to anything map.
 type concurrentMapSharedUint32 struct {
-	items map[uint32]interface{}
+	items        map[uint32]interface{}
 	sync.RWMutex // Read Write mutex, guards access to internal map.
 }
 

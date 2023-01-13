@@ -1,46 +1,27 @@
+// Date         : 2018/7/29
+// Author       : zhangchaoyang
+// Description  :
 package radic
 
 import (
-	"os"
-	"radic/inverted_index"
-	"radic/distributed"
+	"context"
+	core "radic/inverted_index"
 	"radic/types"
-	"radic/util"
-	"syscall"
 	"time"
 )
 
 type IndexEngine struct {
-	indexer         inverted_index.Indexer
-	van             *distributed.Van
-	distributedMode bool
-	stopChanSig     chan os.Signal
+	indexer core.Indexer
 }
 
 //Init 初始化参数，并从local db中加载索引
-func (engine *IndexEngine) Init(indexOpts types.IndexerOpts, distOpts types.DistOpts, logFile string) {
-	util.InitLogger(logFile)
+func (engine *IndexEngine) Init(indexOpts types.IndexerOpts) {
 	engine.indexer.Init(indexOpts)
-	engine.van = distributed.GetVanInstance(distOpts)
-	if engine.van == nil {
-		util.Log.Printf("init radic in single mode")
-	} else {
-		engine.distributedMode = true
-		engine.stopChanSig = make(chan os.Signal, engine.van.Balancer.GetGroupCount())
-		util.Log.Printf("init radic in distributed mode")
-	}
 }
 
 //Destroy 释放各种资源
 func (engine *IndexEngine) Destroy() {
 	engine.indexer.Close()
-	if engine.distributedMode {
-		for i := 0; i < engine.van.Balancer.GetGroupCount(); i++ {
-			engine.stopChanSig <- syscall.SIGTERM
-		}
-		time.Sleep(2 * time.Second)
-		engine.van.Balancer.Destroy()
-	}
 }
 
 //IndexDoc 往索引上添加一个doc。异步执行的，不会立即生效
@@ -60,13 +41,40 @@ func (engine *IndexEngine) RemoveDoc(docId uint32) {
 
 //Search 根据条件去索引上搜索doc
 func (engine *IndexEngine) Search(request types.SearchRequest) types.SearchResp {
-	if !engine.distributedMode {
-		//单机模式，在本机执行搜索
-		return distributed.Search(&request, &engine.indexer)
-	} else {
-		//分布式，在集群上执行搜索
-		return engine.van.Search(&request, &engine.indexer)
+	must := request.Must
+	should := request.Should
+	not := request.Not
+	orderLess := request.Orderless
+	offset := request.OutputOffset
+	var timeout int32 = 2000 //默认超时2秒
+	if request.Timeout > 0 {
+		timeout = request.Timeout //以request.Timeout为准
 	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Millisecond)
+	defer cancel()
+	result := make(chan []*types.DocInfo, 1)
+	go func() {
+		result <- engine.indexer.Lookup(must, should, not, orderLess, request.FilterIds, request.OnFlag, request.OffFlag, request.OrFlags)
+	}()
+
+	resp := types.SearchResp{}
+	select {
+	case docInfos := <-result:
+		resp.Total = int32(len(docInfos))
+		if !request.CountDocsOnly && resp.Total > offset {
+			count := resp.Total - offset
+			docs := make([][]byte, count)
+			for i := offset; i < offset+count; i++ {
+				docs[i] = docInfos[i].Entry
+			}
+			resp.Docs = docs
+		}
+	case <-ctx.Done():
+		resp.Timeout = true
+	}
+
+	return resp
 }
 
 //IterIndex 遍历索引里的数据
@@ -134,22 +142,16 @@ func (engine *IndexEngine) InvertIndexStatistics(outfile string) int {
 	return engine.indexer.InvertIndexStatistics(outfile)
 }
 
-//ListenInnerRequest 开始接收集群内部其他server的检索请求
-func (engine *IndexEngine) ListenInnerRequest() {
-	if engine.distributedMode {
-		engine.van.ReceiveInnerRequest(&engine.indexer, &engine.stopChanSig)
-	}
-}
-
 //GetInvertListLen 获取倒排链上有几个docid
 func (engine *IndexEngine) GetInvertListLen(keyword *types.Keyword, onFlag uint32, offFlag uint32, orFlags []uint32) int32 {
-	if !engine.distributedMode {
-		//单机模式，在本机上计数
-		resp := distributed.GetInvertListLen(keyword, onFlag, offFlag, orFlags, &engine.indexer)
-		return resp.Total
-	} else {
-		//分布式，各台worker上的倒排链求和
-		resp := engine.van.GetInvertListLen(keyword, onFlag, offFlag, orFlags, &engine.indexer)
-		return resp.Total
+	var count int32 = 0
+	if keyword != nil && len(keyword.Word) > 0 {
+		count = engine.indexer.GetInvertListLen(keyword, onFlag, offFlag, orFlags)
 	}
+	return count
 }
+
+//UpdateForwardIndex 更新正排数据，前提是doc的keys无变化
+//func (engine *IndexEngine) UpdateForwardIndex(doc *types.DocInfo) {
+//	engine.indexer.UpdateDetail(doc)
+//}

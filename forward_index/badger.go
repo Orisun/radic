@@ -1,14 +1,17 @@
+// Date         : 2018/7/28
+// Author       : zhangchaoyang
+// Description  :
 package storage
 
 import (
-	"github.com/dgraph-io/badger"
-	"github.com/dgraph-io/badger/options"
 	"errors"
+	"log"
 	"os"
 	"path"
-	"radic/util"
 	"sync/atomic"
-	"time"
+
+	"github.com/dgraph-io/badger"
+	"github.com/dgraph-io/badger/options"
 )
 
 type Badger struct {
@@ -39,14 +42,14 @@ func OpenBadger(dbPath string) (Storage, error) {
 	if err := os.MkdirAll(path.Dir(dbPath), os.ModePerm); err != nil { //如果dbPath对应的文件夹已存在则什么都不做，如果dbPath对应的文件已存在则返回错误
 		return nil, err
 	}
-	
+
 	badgerOptions.Dir = dbPath
 	badgerOptions.ValueDir = dbPath
 	db, err := badger.Open(badgerOptions) //文件只能被一个进程使用，如果不调用Close则下次无法Open。手动释放锁的办法：把LOCK文件删掉
 	if err != nil {
 		panic(err)
 	}
-	
+
 	return &Badger{db, dbPath}, err
 }
 
@@ -63,17 +66,17 @@ func (s *Badger) CheckAndGC() {
 	}
 	lsmSize2, vlogSize2 := s.db.Size()
 	if vlogSize2 < vlogSize1 {
-		util.Log.Printf("badger before GC, LSM %d, vlog %d. after GC, LSM %d, vlog %d", lsmSize1, vlogSize1, lsmSize2, vlogSize2)
+		log.Printf("badger before GC, LSM %d, vlog %d. after GC, LSM %d, vlog %d", lsmSize1, vlogSize1, lsmSize2, vlogSize2)
 	} else {
-		util.Log.Printf("collect zero garbage")
+		log.Printf("collect zero garbage")
 	}
 }
 
 //Set 为单个写操作开一个事务
 func (s *Badger) Set(k, v []byte) error {
 	err := s.db.Update(func(txn *badger.Txn) error { //db.Update相当于打开了一个读写事务:db.NewTransaction(true)。用db.Update的好处在于不用显式调用Txn.Commit()了
-		duration := time.Hour * 87600
-		return txn.SetWithTTL(k, v, duration) //duration是能存活的时长
+		//duration := time.Hour * 87600
+		return txn.Set(k, v) //duration是能存活的时长
 	})
 	return err
 }
@@ -87,11 +90,12 @@ func (s *Badger) BatchSet(keys, values [][]byte) error {
 	txn := s.db.NewTransaction(true)
 	for i, key := range keys {
 		value := values[i]
-		duration := time.Hour * 87600
-		if err = txn.SetWithTTL(key, value, duration); err != nil {
+		//duration := time.Hour * 87600
+		//util.Log.Debugf("duration",duration)
+		if err = txn.Set(key, value); err != nil {
 			_ = txn.Commit() //发生异常时就提交老事务，然后开一个新事务，重试set
 			txn = s.db.NewTransaction(true)
-			_ = txn.SetWithTTL(key, value, duration)
+			_ = txn.Set(key, value)
 		}
 	}
 	txn.Commit()
@@ -139,7 +143,7 @@ func (s *Badger) BatchGet(keys [][]byte) ([][]byte, error) {
 				values[i] = []byte{} //拷贝失败就把value设为空数组
 			}
 		} else { //读取失败
-			values[i] = []byte{} //读取失败就把value设为空数组
+			values[i] = []byte{}              //读取失败就把value设为空数组
 			if err != badger.ErrKeyNotFound { //如果真的发生异常，则开一个新事务继续读后面的key
 				txn.Discard()
 				txn = s.db.NewTransaction(false)
@@ -198,17 +202,17 @@ func (s *Badger) IterDB(fn func(k, v []byte) error) int64 {
 		for it.Rewind(); it.Valid(); it.Next() {
 			item := it.Item()
 			key := item.Key()
-			
+
 			var ival []byte
 			//var err error
 			//buffer := make([]byte, badgerOptions.ValueLogMaxEntries)
 			//ival, err = item.ValueCopy(buffer)
-			
+
 			err := item.Value(func(val []byte) error {
 				ival = val
 				return nil
 			})
-			
+
 			if err != nil {
 				continue
 			}

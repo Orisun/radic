@@ -1,13 +1,14 @@
+// Date         : 2018/7/28
+// Author       : zhangchaoyang
+// Description  :
 package storage
 
-import (
-	"fmt"
-)
+import "fmt"
 
 var storageOpenFunction = map[string]func(path string) (Storage, error){
-	"badger":  OpenBadger,
-	"rocksdb": OpenRocksdb,
-	"bolt":    OpenBolt,
+	"badger": OpenBadger,
+	"bolt":   OpenBolt,
+	// "rocksdb":OpenRocksdb,
 }
 
 type Storage interface {

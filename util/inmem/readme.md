@@ -16,7 +16,7 @@
 # example
 
         import (
-                "inmem"
+                "code.byted.org/gopkg/inmem"
                 "fmt"
                 "time"
         )

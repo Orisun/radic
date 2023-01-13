@@ -31,4 +31,4 @@ message SearchResp {
     bool Timeout = 3; //是否超时。通常情况下如果超时则Docs为空Total为0，如果Total不为0则Total就是准确的结果，如果Docs不为空则Docs只存储了部分结果
 }
 
-//protoc --go_out=. radic.proto
+// protoc --proto_path ./types --gogofaster_out=./types radic.proto

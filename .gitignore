@@ -1,4 +1,5 @@
-*.log
-dbs/
 .DS_Store/
 .idea/
+db/
+dbs/
+sta.txt

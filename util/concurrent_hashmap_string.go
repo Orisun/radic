@@ -1,3 +1,6 @@
+// Date         : 2018/7/28
+// Author       : zhangchaoyang
+// Description  :
 package util
 
 import (
@@ -16,7 +19,7 @@ type ConcurrentMapString struct {
 
 // A "thread" safe string to anything map.
 type concurrentMapSharedString struct {
-	items map[string]interface{}
+	items        map[string]interface{}
 	sync.RWMutex // Read Write mutex, guards access to internal map.
 }
 

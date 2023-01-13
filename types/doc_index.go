@@ -1,3 +1,6 @@
+// Date         : 2018/7/28
+// Author       : zhangchaoyang
+// Description  : 
 package types
 
 import (
@@ -13,7 +16,7 @@ type DocInfo struct {
 	DocId            uint32
 	CompositeFeature uint32     //32个bit分别对应32个bool属性
 	Keyword          []*Keyword //倒排索引的key
-	RankScore        float32    //粗排得分
+	RankScore        float32
 	Entry            []byte     //正排详情，自行做序列化
 }
 
@@ -107,7 +110,7 @@ func (docs ScoredDocs) topK(k int, begin int, end int) {
 		docs[high] = docs[low]
 	}
 	docs[low] = pivot
-	
+
 	if low+1 == k {
 		return
 	} else if low+1 < k {
