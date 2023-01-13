@@ -10,11 +10,11 @@ go语言实现搜索引擎的索引部分，包括：<br>
 package main
 
 import (
-	"radic/types"
+	"github.com/Orisun/radic/types"
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"radic"
+	"github.com/Orisun/radic"
 	"time"
 )
 

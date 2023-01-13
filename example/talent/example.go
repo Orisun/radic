@@ -7,9 +7,10 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"radic"
-	"radic/types"
 	"time"
+
+	"github.com/Orisun/radic"
+	"github.com/Orisun/radic/types"
 )
 
 type Talent struct {

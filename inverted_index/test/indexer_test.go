@@ -8,10 +8,11 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"fmt"
-	"radic/core"
-	"radic/types"
 	"strconv"
 	"testing"
+
+	core "github.com/Orisun/radic/inverted_index"
+	"github.com/Orisun/radic/types"
 )
 
 var indexer core.Indexer
@@ -32,10 +33,10 @@ type Talent struct {
 	Is211 bool
 }
 
-func (self *Talent) Serialize() []byte {
+func (talent *Talent) Serialize() []byte {
 	var value bytes.Buffer
 	encoder := gob.NewEncoder(&value) //gob是go自带的序列化方法
-	err := encoder.Encode(self)
+	err := encoder.Encode(talent)
 	if err == nil {
 		return value.Bytes()
 	} else {
@@ -224,7 +225,7 @@ func TestAddLookup(t *testing.T) {
 	fmt.Println("把待删除的彻底删除")
 	indexer.CleanToBeDeleteBuffer()
 	results = indexer.Lookup(must, should, not, false, nil, onFlag, offFlag, orFlags)
-	if results == nil || len(results) == 0 {
+	if len(results) == 0 {
 		fmt.Println("没有搜索结果")
 	} else {
 		for _, doc := range results {

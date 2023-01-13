@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	defaultIndexName             = "radic"
+	defaultIndexName             = "github.com/Orisun/radic"
 	defaultAddCacheSize          = 10000
 	defaultDeleteCacheSize       = 1000
 	defaultInvertIndexSegmentNum = 32

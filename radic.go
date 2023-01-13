@@ -5,9 +5,10 @@ package radic
 
 import (
 	"context"
-	core "radic/inverted_index"
-	"radic/types"
 	"time"
+
+	core "github.com/Orisun/radic/inverted_index"
+	"github.com/Orisun/radic/types"
 )
 
 type IndexEngine struct {

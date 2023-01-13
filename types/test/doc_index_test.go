@@ -6,8 +6,9 @@ package test
 
 import (
 	"fmt"
-	"radic/types"
 	"testing"
+
+	"github.com/Orisun/radic/types"
 )
 
 func TestTopScoreDoc(t *testing.T) {

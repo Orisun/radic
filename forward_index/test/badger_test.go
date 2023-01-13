@@ -8,10 +8,10 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"fmt"
+	storage "github.com/Orisun/radic/forward_index"
+	"github.com/Orisun/radic/types"
 	"log"
 	"os"
-	storage "radic/forward_index"
-	"radic/types"
 	"testing"
 )
 

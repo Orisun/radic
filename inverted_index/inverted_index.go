@@ -12,15 +12,16 @@ import (
 	"math"
 	"os"
 	"path"
-	storage "radic/forward_index"
-	"radic/types"
-	"radic/util"
-	"radic/util/inmem"
 	"runtime"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	storage "github.com/Orisun/radic/forward_index"
+	"github.com/Orisun/radic/types"
+	"github.com/Orisun/radic/util"
+	"github.com/Orisun/radic/util/inmem"
 
 	"log"
 

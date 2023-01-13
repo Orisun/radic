@@ -7,9 +7,9 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	storage "github.com/Orisun/radic/forward_index"
+	"github.com/Orisun/radic/types"
 	"os"
-	storage "radic/forward_index"
-	"radic/types"
 	"testing"
 )
 
