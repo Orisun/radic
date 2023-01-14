@@ -20,10 +20,10 @@ type Talent struct {
 	Is211 bool
 }
 
-func (self *Talent) Serialize() []byte {
+func (talent *Talent) Serialize() []byte {
 	var value bytes.Buffer
 	encoder := gob.NewEncoder(&value) //gob是go自带的序列化方法
-	err := encoder.Encode(self)
+	err := encoder.Encode(talent)
 	if err == nil {
 		return value.Bytes()
 	} else {

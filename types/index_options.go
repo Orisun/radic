@@ -82,4 +82,13 @@ func (options *IndexerOpts) Init() {
 	if options.MaxInvertListLen == 0 {
 		options.MaxInvertListLen = defaultMaxInvertListLen
 	}
+	if options.PreRankCriteria == nil {
+		options.PreRankCriteria = new(DefaultPreRankCriteria)
+	}
+}
+
+type DefaultPreRankCriteria struct{}
+
+func (DefaultPreRankCriteria) Score(s float32) float32 {
+	return s
 }
