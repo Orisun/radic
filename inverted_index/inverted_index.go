@@ -98,6 +98,7 @@ func (indexer *Indexer) Close() {
 			log.Fatalf("close local db failed: %v", err)
 		}
 	}
+	indexer.initialized = false
 	log.Printf("close all local db")
 }
 
