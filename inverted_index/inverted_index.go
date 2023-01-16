@@ -224,6 +224,7 @@ func (indexer *Indexer) storageKey2DocId(key []byte) uint32 {
 //IterIndex 遍历索引里的数据
 func (indexer *Indexer) IterIndex(fn func(docId uint32, docInfo types.DocInfo) error) {
 	if indexer.stoped {
+		log.Printf("index engine is stopped")
 		return
 	}
 	indexer.taskCount.Add(1)
@@ -246,6 +247,7 @@ func (indexer *Indexer) IterIndex(fn func(docId uint32, docInfo types.DocInfo) e
 //IterKeyOnIndex 遍历索引里的key
 func (indexer *Indexer) IterKeyOnIndex(fn func(docId uint32) error) error {
 	if indexer.stoped {
+		log.Printf("index engine is stopped")
 		return nil
 	}
 	indexer.taskCount.Add(1)
@@ -339,6 +341,7 @@ func (indexer *Indexer) AddToLocalDB(doc *types.DocInfo) {
 //DocNum 索引中的文档总数。若indexer.initOptions.PreRankCriteria为nil，则返回-1
 func (indexer *Indexer) DocNum() int {
 	if indexer.stoped {
+		log.Printf("index engine is stopped")
 		return 0
 	}
 	indexer.taskCount.Add(1)
@@ -354,6 +357,7 @@ func (indexer *Indexer) DocNum() int {
 
 func (indexer *Indexer) BatchIndexDoc(originDocs []*types.DocInfo) {
 	if indexer.stoped {
+		log.Printf("index engine is stopped")
 		return
 	}
 	indexer.taskCount.Add(1)
@@ -516,6 +520,7 @@ func (indexer *Indexer) deleteDoc(docId uint32) {
 //AddDeletePair 从倒排索引的一个key上把指定docID删掉。这是异步执行的，积累到一定量才会真正执行
 func (indexer *Indexer) AddDeletePair(docId uint32, word *types.Keyword) {
 	if indexer.stoped {
+		log.Printf("index engine is stopped")
 		return
 	}
 	indexer.taskCount.Add(1)
@@ -537,6 +542,7 @@ func (indexer *Indexer) AddDeletePair(docId uint32, word *types.Keyword) {
 //IndexDoc 往索引上添加一个doc。该操作中异步执行的
 func (indexer *Indexer) IndexDoc(doc types.DocInfo) {
 	if indexer.stoped {
+		log.Printf("index engine is stopped")
 		return
 	}
 	indexer.taskCount.Add(1)
@@ -547,6 +553,7 @@ func (indexer *Indexer) IndexDoc(doc types.DocInfo) {
 //RemoveDoc 从索引上删除doc。该操作中异步执行的
 func (indexer *Indexer) RemoveDoc(docId uint32) {
 	if indexer.stoped {
+		log.Printf("index engine is stopped")
 		return
 	}
 	indexer.taskCount.Add(1)
@@ -557,6 +564,7 @@ func (indexer *Indexer) RemoveDoc(docId uint32) {
 //Lookup 根据条件去索引上搜索doc
 func (indexer *Indexer) Lookup(must []*types.Keyword, should []*types.Keyword, not []*types.Keyword, orderLess bool, filterIds map[uint32]bool, onFlag uint32, offFlag uint32, orFlags []uint32) []*types.DocInfo {
 	if indexer.stoped {
+		log.Printf("index engine is stopped")
 		return nil
 	}
 	indexer.taskCount.Add(1)
@@ -933,6 +941,7 @@ func (indexer *Indexer) shouldFind(words []*types.Keyword, filterIds map[uint32]
 //CleanToBeDeleteBuffer 把toBeDeleteBuffer里需要删的doc从倒排索引上删除，同时也从toBeDeleteBuffer里删除
 func (indexer *Indexer) CleanToBeDeleteBuffer() {
 	if indexer.stoped {
+		log.Printf("index engine is stopped")
 		return
 	}
 	indexer.taskCount.Add(1)
@@ -1000,6 +1009,7 @@ func (indexer *Indexer) CleanToBeDeleteBuffer() {
 //GetDoc 根据ID获取一个doc的详情。flag=1仅获取detail，flag=0都获取
 func (indexer *Indexer) GetDoc(docId uint32, flag int) *types.DocInfo {
 	if indexer.stoped {
+		log.Printf("index engine is stopped")
 		return nil
 	}
 	indexer.taskCount.Add(1)
@@ -1048,6 +1058,7 @@ func (indexer *Indexer) GetDoc(docId uint32, flag int) *types.DocInfo {
 //GetDocs 根据ID获取一批doc的详情
 func (indexer *Indexer) GetDocs(docIds []uint32) []*types.DocInfo {
 	if indexer.stoped {
+		log.Printf("index engine is stopped")
 		return []*types.DocInfo{}
 	}
 	indexer.taskCount.Add(1)
@@ -1117,6 +1128,7 @@ func (indexer *Indexer) GetDocs(docIds []uint32) []*types.DocInfo {
 
 func (indexer *Indexer) LoadDataFromDb2InvertIndex() int {
 	if indexer.stoped {
+		log.Printf("index engine is stopped")
 		return 0
 	}
 	indexer.taskCount.Add(1)
@@ -1176,6 +1188,7 @@ func (indexer *Indexer) LoadDataFromDb2InvertIndex() int {
 
 func (indexer *Indexer) QuickLoadDataFromDb2InvertIndex() int {
 	if indexer.stoped {
+		log.Printf("index engine is stopped")
 		return 0
 	}
 	indexer.taskCount.Add(1)
@@ -1244,6 +1257,7 @@ func (indexer *Indexer) QuickLoadDataFromDb2InvertIndex() int {
 //InvertIndexStatistics 统计倒排索引上每个关键词下面有几个docID，给indexer.invertListLen赋值，返回倒排链的总数
 func (indexer *Indexer) InvertIndexStatistics(outfile string) int {
 	if indexer.stoped {
+		log.Printf("index engine is stopped")
 		return 0
 	}
 	indexer.taskCount.Add(1)
