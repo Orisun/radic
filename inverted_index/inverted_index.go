@@ -187,6 +187,7 @@ func (indexer *Indexer) Init(options types.IndexerOpts) {
 			}
 		}()
 	}
+	indexer.stoped = false
 }
 
 func (indexer *Indexer) GetDbPath() string {
