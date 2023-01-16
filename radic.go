@@ -15,7 +15,7 @@ type IndexEngine struct {
 	indexer core.Indexer
 }
 
-//Init 初始化参数，并从local db中加载索引
+//Init 初始化参数，并启动引擎的各个后台协程
 func (engine *IndexEngine) Init(indexOpts types.IndexerOpts) {
 	engine.indexer.Init(indexOpts)
 }

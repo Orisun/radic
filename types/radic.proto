@@ -11,24 +11,24 @@ message SearchRequest {
     /**
 	Not优先级最高，Must和Should需要同时满足，Must和Should至少有一个不能为空
 	 */
-    repeated Keyword Must = 1; //Must中的关键词必须全部包含
-    repeated Keyword Should = 2; //Should中的关键词至少需要包含一个
-    repeated Keyword Not = 3; //Not中的关键词一个都不能包含
-    int32 OutputOffset = 4; // 从第几条结果开始输出
-    bool Orderless = 5; //为True时不排序
-    bool CountDocsOnly = 6; //为True时只返回文档数，不返回具体的文档
-    int32 Timeout = 7; //设置检索超时时间，单位毫秒。超时的情况下仍有可能返回部分结果
-    map<uint32, bool> FilterIds = 8; //这些id过滤掉
-    uint32 OnFlag = 9; //对应位上必须全为1
-    uint32 OffFlag = 10; //对应位上必须全为0
-    int32 RequestType = 11; //0:搜索请求；1:检索倒排链的长度
-    repeated uint32 OrFlags = 12; //对应位上必须至少有一位为1
+    repeated Keyword Must = 1;      //Must中的关键词必须全部包含
+    repeated Keyword Should = 2;    //Should中的关键词至少需要包含一个
+    repeated Keyword Not = 3;       //Not中的关键词一个都不能包含
+    int32 OutputOffset = 4;         // 从第几条结果开始输出
+    bool Orderless = 5;             //为True时不排序
+    bool CountDocsOnly = 6;         //为True时只返回文档数，不返回具体的文档
+    int32 Timeout = 7;              //设置检索超时时间，单位毫秒。超时的情况下仍有可能返回部分结果
+    map<uint32, bool> FilterIds = 8;    //这些id过滤掉
+    uint32 OnFlag = 9;                  //对应位上必须全为1
+    uint32 OffFlag = 10;                //对应位上必须全为0
+    int32 RequestType = 11;             //0:搜索请求；1:检索倒排链的长度
+    repeated uint32 OrFlags = 12;       //对应位上必须至少有一位为1
 }
 
 message SearchResp {
     repeated bytes Docs = 1;
-    int32 Total = 2; //满足搜索条件的全部文档数，通常比len(Docs)要大
-    bool Timeout = 3; //是否超时。通常情况下如果超时则Docs为空Total为0，如果Total不为0则Total就是准确的结果，如果Docs不为空则Docs只存储了部分结果
+    int32 Total = 2;            //满足搜索条件的全部文档数，通常比len(Docs)要大
+    bool Timeout = 3;           //是否超时。通常情况下如果超时则Docs为空Total为0，如果Total不为0则Total就是准确的结果，如果Docs不为空则Docs只存储了部分结果
 }
 
 // protoc --proto_path ./types --gogofaster_out=./types radic.proto

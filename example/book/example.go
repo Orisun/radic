@@ -144,3 +144,5 @@ func main() {
 	})
 	fmt.Println("=======================================")
 }
+
+// go run .\example\book

@@ -118,9 +118,12 @@ func main() {
 	engine.IndexDoc(docInfo3)
 	time.Sleep(100 * time.Millisecond)      //稍等一会儿，等Add操作执行完成
 	engine.InvertIndexStatistics("sta.txt") //建好索引后最好调用一次InvertIndexStatistics，有利于搜索速度的提升
+	// engine.LoadDataFromDb2InvertIndex()
 
 	doc := engine.GetDoc(talent1.Id, 1) //仅获取detail
+	// fmt.Println(doc)
 	t2 := DeserializeTalent(doc.Entry)
+	// fmt.Println(t2)
 	fmt.Printf("name of talent %d is %s, keywords %v\n", talent1.Id, t2.Name, doc.Keyword)
 	fmt.Println("================================")
 	doc = engine.GetDoc(talent1.Id, 0) //获取detail和keywords
@@ -188,3 +191,5 @@ func main() {
 	}
 	fmt.Println("================================")
 }
+
+// go run .\example\talent

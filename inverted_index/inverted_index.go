@@ -321,6 +321,7 @@ func (indexer *Indexer) AddToLocalDB(doc *types.DocInfo) {
 		detailDB := indexer.dbs[shardId1]
 		storageKey := indexer.getStorageKey(doc.DocId)
 		detailDB.Set(storageKey, value.Bytes())
+		// fmt.Printf("add doc %d to shard %d %d\n", doc.DocId, shardId1, shardId2)
 
 		var value2 bytes.Buffer
 		encoder2 := gob.NewEncoder(&value2)
@@ -1018,6 +1019,7 @@ func (indexer *Indexer) GetDoc(docId uint32, flag int) *types.DocInfo {
 			//把要删除的docId存到deleteTable上
 			indexer.AddDeletePair(docId, &types.Keyword{})
 		} else {
+			// fmt.Println("datasBytes", datasBytes)
 			buf := bytes.NewReader(datasBytes)
 			dec := gob.NewDecoder(buf)
 			err := dec.Decode(&data)
@@ -1025,6 +1027,8 @@ func (indexer *Indexer) GetDoc(docId uint32, flag int) *types.DocInfo {
 				indexer.forwardTable.Add(docId, &data, OutOfFuture) //放入缓存，缓存里面没有keys
 			}
 		}
+	} else {
+		log.Printf("read local db faile: %v", error)
 	}
 	if flag == 0 && data.DocId > 0 {
 		var keys []*types.Keyword
@@ -1129,6 +1133,7 @@ func (indexer *Indexer) LoadDataFromDb2InvertIndex() int {
 			err := detailDecoder.Decode(&data)
 			if err == nil {
 				storageKey := indexer.getStorageKey(data.DocId)
+				// fmt.Printf("doc id %d\n", data.DocId)
 				if keyBytes, err2 := keysDB.Get(storageKey); err2 == nil {
 					if len(keyBytes) > 0 {
 						keysReader.Reset(keyBytes)
@@ -1163,6 +1168,7 @@ func (indexer *Indexer) LoadDataFromDb2InvertIndex() int {
 	indexer.InvertIndexStatistics("")
 
 	t := int(atomic.LoadInt32(&total))
+	log.Printf("total load %d docs from local db to inverted index", t)
 	indexer.execDeleteThresh = int(float64(t) * BATCH_DELETE_PERSENT)
 	return t
 }
@@ -1229,6 +1235,7 @@ func (indexer *Indexer) QuickLoadDataFromDb2InvertIndex() int {
 	indexer.InvertIndexStatistics("")
 
 	t := int(atomic.LoadInt32(&total))
+	log.Printf("total load %d docs from local db to inverted index", t)
 	indexer.execDeleteThresh = int(float64(t) * BATCH_DELETE_PERSENT)
 	return t
 }
