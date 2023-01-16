@@ -68,8 +68,8 @@ func main() {
 		MaxRetrieve:           2, //搜索时最多返回2条结果
 	}
 	engine := radic.IndexEngine{}
-	engine.Init(options)
-	defer engine.Destroy()
+	engine.Start(options)
+	defer engine.Stop()
 
 	talent1 := Talent{
 		Id:    111111,
@@ -118,7 +118,9 @@ func main() {
 	engine.IndexDoc(docInfo3)
 	time.Sleep(100 * time.Millisecond)      //稍等一会儿，等Add操作执行完成
 	engine.InvertIndexStatistics("sta.txt") //建好索引后最好调用一次InvertIndexStatistics，有利于搜索速度的提升
-	// engine.LoadDataFromDb2InvertIndex()
+	engine.Stop()
+	engine.Start(options)
+	engine.LoadDataFromDb2InvertIndex()
 
 	doc := engine.GetDoc(talent1.Id, 1) //仅获取detail
 	// fmt.Println(doc)

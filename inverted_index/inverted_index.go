@@ -70,7 +70,7 @@ type Indexer struct {
 //Close 关闭local db，释放倒排索引所占的内存
 func (indexer *Indexer) Close() {
 	if !indexer.initialized {
-		fmt.Println("indexer have not initialized")
+		log.Printf("indexer have not initialized")
 		return
 	}
 
