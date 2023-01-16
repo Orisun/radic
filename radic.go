@@ -16,12 +16,12 @@ type IndexEngine struct {
 }
 
 //Init 初始化参数，并启动引擎的各个后台协程
-func (engine *IndexEngine) Init(indexOpts types.IndexerOpts) {
+func (engine *IndexEngine) Start(indexOpts types.IndexerOpts) {
 	engine.indexer.Init(indexOpts)
 }
 
-//Destroy 释放各种资源
-func (engine *IndexEngine) Destroy() {
+//Destroy 关闭引擎，释放各种资源
+func (engine *IndexEngine) Stop() {
 	engine.indexer.Close()
 }
 
