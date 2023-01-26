@@ -63,8 +63,8 @@ func main() {
 	}
 
 	engine := radic.IndexEngine{}
-	engine.Init(options)
-	defer engine.Destroy()
+	engine.Start(options)
+	defer engine.Stop()
 
 	/**
 	往索引上添加数据
