@@ -1,20 +1,20 @@
 # 倒排索引
 ## 倒排链的基本结构
-![avatar](https://github.com/Orisun/radic/blob/master/img/invert_index.png)
+![avatar](../img/invert_index.png)
 倒排链上的每个元素是uint64，由2个uint32拼接而成，第一个uint32是doc id，第二个uint32是CompositeFeature，CompositeFeature可以表示doc的32个bool属性。<br>
 搜索"工业机器学习"，即求第一个和第四个倒排链的交集，返回doc id的集合{1,5,2}。<br>
 整个倒排索引是由多个map构成的。没有采用ConcurrentHashMap，而是用原生的Map，读写时对整个map加锁，为减少并发等待，分了1000个Map。
 ## bits过滤
 搜索经常带筛选条件，比如只搜价格在50-100元之间的英文图书。如果倒排链上只存doc id就无法完成筛选功能，如果倒排链上存储doc详情则内存容不下，折中的办法是倒排链上存储doc的bool属性，这样4个字节就可以存下32个bool
 属性。<br>
-![avatar](https://github.com/Orisun/radic/blob/master/img/bit1.png)
+![avatar](../img/bit1.png)
 检索时传入3个int32参数，on表示对应的bit位必须全是1，off表示对应的bit位必须全是0，or表示对应的bit位必须至少有一个是1，即：<br>
 ```
 bits & on == on
 bits & off == 0
 bits & or > 0
 ```
-![avatar](https://github.com/Orisun/radic/blob/master/img/bit2.png)
+![avatar](../img/bit2.png)
 32个bit通常会有富余，可以拿出一些bit来表示doc的连续属性。如上图所示，对价格进行了离散化，每一段都是闭区间，"80元"刚好位于2个区间的交接点上，则这2个区间都置为1。
 ## 超时控制
 - Query中有多个关键词时各条链并行遍历
