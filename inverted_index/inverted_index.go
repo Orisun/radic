@@ -50,10 +50,10 @@ type Indexer struct {
 	initOptions        types.IndexerOpts
 	initialized        bool //是否已调用过Init函数
 
-	addChannel         chan types.DocInfo //从此channel取出数据，从正排索引和倒排索引上将对应的doc删掉
-	deleteChannel      chan uint32        //从此channel取出数据，从正排索引上将对应的doc删掉
-	shutDown           chan bool          //通知add和delete子协和退出
-	stoped             bool               //置为true之后，所有请求都拒绝执行
+	addChannel    chan types.DocInfo //从此channel取出数据，从正排索引和倒排索引上将对应的doc删掉
+	deleteChannel chan uint32        //从此channel取出数据，从正排索引上将对应的doc删掉
+	// shutDown           chan bool          //通知add和delete子协和退出
+	stoped             bool //置为true之后，所有请求都拒绝执行
 	addRoutineFinished sync.WaitGroup
 	delRoutineFinished sync.WaitGroup
 	toBeDeleteBuffer   *util.ConcurrentMapString //从倒排索引上检出数据后，如果发现在这个集合里，则从倒排索引上删掉。sync.Map是go1.9中新加入的线程安全的map，性能没有ConcurrentMap高
@@ -75,18 +75,19 @@ func (indexer *Indexer) Close() {
 	}
 
 	indexer.stoped = true
-	indexer.shutDown <- true
+	// indexer.shutDown <- true
 	runtime.Gosched()
 	indexer.taskCount.Wait() //等正在执行的工作结束
 	log.Printf("all task of indexer stoped")
-	//等两组子协程结束
+
+	//关闭add和delete管道，分别等两组子协程结束
+	close(indexer.addChannel)
+	close(indexer.deleteChannel)
 	indexer.addRoutineFinished.Wait()
 	log.Printf("add doc routines finished")
 	indexer.delRoutineFinished.Wait()
 	log.Printf("delete doc routines finished")
 
-	close(indexer.addChannel)
-	close(indexer.deleteChannel)
 	indexer.invertedTables = nil
 	indexer.forwardTable = nil
 	indexer.toBeDeleteBuffer = nil //从map中delete key根本不会释放内存，只能设为nil，静待GC
@@ -139,7 +140,7 @@ func (indexer *Indexer) Init(options types.IndexerOpts) {
 	if indexer.initOptions.PreRankCriteria != nil { //如果没有指定PreRankCriteria，则不需要用到indexer.docScores缓存
 		indexer.docScores = util.NewConcurrentMapUint32(32)
 	}
-	indexer.shutDown = make(chan bool, 2*(options.AddDocThreads+options.DeleteDocThreads))
+	// indexer.shutDown = make(chan bool, 2*(options.AddDocThreads+options.DeleteDocThreads))
 	indexer.addRoutineFinished = sync.WaitGroup{}
 	indexer.addRoutineFinished.Add(options.AddDocThreads)
 	indexer.delRoutineFinished = sync.WaitGroup{}
@@ -158,42 +159,55 @@ func (indexer *Indexer) Init(options types.IndexerOpts) {
 	//启动addDoc的消费线程
 	for i := 0; i < options.AddDocThreads; i++ {
 		go func() {
-			defer indexer.addRoutineFinished.Done()
-			stop := false
-			for !stop {
-				select {
-				case doc := <-indexer.addChannel: //如果addChannel已空，该行代码会一直阻塞，所以放在select里通过shutDown这个管道来强制它退出
+			for {
+				if doc, ok := <-indexer.addChannel; ok {
 					indexer.addDoc(doc)
-				case <-indexer.shutDown:
-					indexer.shutDown <- true
-					stop = true
+				} else { //indexer.addChannel管道已关闭，且
+					break
 				}
+
 			}
+			// defer indexer.addRoutineFinished.Done()
+			// stop := false
+			// for !stop {
+			// 	select {
+			// 	case doc := <-indexer.addChannel: //如果addChannel已空，该行代码会一直阻塞，所以放在select里通过shutDown这个管道来强制它退出
+			// 		indexer.addDoc(doc)
+			// 	case <-indexer.shutDown:
+			// 		indexer.shutDown <- true
+			// 		stop = true
+			// 	}
+			// }
 		}()
 	}
 
 	//启动deleteDoc的消费线程
 	for i := 0; i < options.DeleteDocThreads; i++ {
 		go func() {
-			defer indexer.delRoutineFinished.Done()
-			stop := false
-			for !stop {
-				select {
-				case docId := <-indexer.deleteChannel: //如果deleteChannel已空，该行代码会一直阻塞，所以放在select里通过shutDown这个管道来强制它退出
+			for {
+				if docId, ok := <-indexer.deleteChannel; ok {
 					indexer.deleteDoc(docId)
-				case <-indexer.shutDown:
-					indexer.shutDown <- true
-					stop = true
+				} else {
+					break
 				}
 			}
+			// defer indexer.delRoutineFinished.Done()
+			// stop := false
+			// for !stop {
+			// 	select {
+			// 	case docId := <-indexer.deleteChannel: //如果deleteChannel已空，该行代码会一直阻塞，所以放在select里通过shutDown这个管道来强制它退出
+			// 		indexer.deleteDoc(docId)
+			// 	case <-indexer.shutDown:
+			// 		indexer.shutDown <- true
+			// 		stop = true
+			// 	}
+			// }
 		}()
 	}
 	indexer.stoped = false
 }
 
 func (indexer *Indexer) GetDbPath() string {
-	indexer.taskCount.Add(1)
-	defer indexer.taskCount.Done()
 	return indexer.initOptions.DbPath
 }
 
