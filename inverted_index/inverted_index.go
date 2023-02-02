@@ -76,9 +76,6 @@ func (indexer *Indexer) Close() {
 
 	indexer.stoped = true
 	// indexer.shutDown <- true
-	runtime.Gosched()
-	indexer.taskCount.Wait() //等正在执行的工作结束
-	log.Printf("all task of indexer stoped")
 
 	//关闭add和delete管道，分别等两组子协程结束
 	close(indexer.addChannel)
@@ -87,13 +84,19 @@ func (indexer *Indexer) Close() {
 	log.Printf("add doc routines finished")
 	indexer.delRoutineFinished.Wait()
 	log.Printf("delete doc routines finished")
+	//等正在执行的所有工作结束
+	// runtime.Gosched()
+	// indexer.taskCount.Wait()
+	// log.Printf("all task of indexer stoped")
 
+	//释放内存
 	indexer.invertedTables = nil
 	indexer.forwardTable = nil
 	indexer.toBeDeleteBuffer = nil //从map中delete key根本不会释放内存，只能设为nil，静待GC
 	indexer.docScores = nil
 	runtime.GC()
 
+	//关闭localDB（释放文件锁，即删除LOCK文件）
 	for _, db := range indexer.dbs {
 		if err := db.Close(); err != nil {
 			log.Fatalf("close local db failed: %v", err)
