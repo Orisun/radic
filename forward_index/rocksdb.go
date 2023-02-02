@@ -1,9 +1,5 @@
 package storage
 
-/*
-Linux安装gorocksdb,参考安装 https://blog.csdn.net/TaroYoVen/article/details/88813386
-*/
-
 import (
 	"fmt"
 	"log"
@@ -13,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/tecbot/gorocksdb"
+	"github.com/line/gorocksdb"
 )
 
 //一些基本概念：
