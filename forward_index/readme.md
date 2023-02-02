@@ -42,7 +42,7 @@ B树每插入一条数据都要写磁盘，而Log-Structured Merge-tree先将大
 - 根据rank和select函数可以快速定位到任意节点的父节点和子节点，从而实现对树的遍历。
 ### key/value存储引擎
 ![avatar](../img/kvengine.png)
-- 生产环境实测，bolt比rocksdb慢27%，badger和rocksdb速度相当、内存消耗相当，但rocksdb内存更稳定。
+- 上面这个表格是官方文档，不要太当真。生产环境实测，bolt比rocksdb慢27%，badger和rocksdb速度相当，但badger对CPU和内存的浪费是巨大的，远没有rocksdb节俭。所以数据量小时建议用badger(安装go rocksdb太麻烦了，参见<a href="install_rocksdb.md" alt="install_rocksdb.md">我的安装经历</a>)，数据量大时建议用rocksdb。  
 - 当随机读是主要操作时，Rocksdb的参数调优：
   - memtable选用HashSkipList
   - SST采用PlainTable
