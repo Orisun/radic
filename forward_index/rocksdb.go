@@ -1,14 +1,7 @@
 package storage
 
 /*
-Install RocksDB
-You'll need to build RocksDB v5.16+ on your machine.
-
-After that, you can install gorocksdb using the following command:
-
-CGO_CFLAGS="-I/path/to/rocksdb/include" \
-CGO_LDFLAGS="-L/path/to/rocksdb -lrocksdb -lstdc++ -lm -lz -lbz2 -lsnappy -llz4 -lzstd" \
-  go get github.com/tecbot/gorocksdb
+Linux安装gorocksdb,参考安装 https://blog.csdn.net/TaroYoVen/article/details/88813386
 */
 
 import (
