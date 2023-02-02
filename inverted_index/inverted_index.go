@@ -50,10 +50,9 @@ type Indexer struct {
 	initOptions        types.IndexerOpts
 	initialized        bool //是否已调用过Init函数
 
-	addChannel    chan types.DocInfo //从此channel取出数据，从正排索引和倒排索引上将对应的doc删掉
-	deleteChannel chan uint32        //从此channel取出数据，从正排索引上将对应的doc删掉
-	// shutDown           chan bool          //通知add和delete子协和退出
-	stoped             bool //置为true之后，所有请求都拒绝执行
+	addChannel         chan types.DocInfo //从此channel取出数据，从正排索引和倒排索引上将对应的doc删掉
+	deleteChannel      chan uint32        //从此channel取出数据，从正排索引上将对应的doc删掉
+	stoped             bool               //置为true之后，所有请求都拒绝执行
 	addRoutineFinished sync.WaitGroup
 	delRoutineFinished sync.WaitGroup
 	toBeDeleteBuffer   *util.ConcurrentMapString //从倒排索引上检出数据后，如果发现在这个集合里，则从倒排索引上删掉。sync.Map是go1.9中新加入的线程安全的map，性能没有ConcurrentMap高
@@ -75,7 +74,6 @@ func (indexer *Indexer) Close() {
 	}
 
 	indexer.stoped = true
-	// indexer.shutDown <- true
 
 	//关闭add和delete管道，分别等两组子协程结束
 	close(indexer.addChannel)
@@ -171,17 +169,6 @@ func (indexer *Indexer) Init(options types.IndexerOpts) {
 				}
 
 			}
-
-			// stop := false
-			// for !stop {
-			// 	select {
-			// 	case doc := <-indexer.addChannel: //如果addChannel已空，该行代码会一直阻塞，所以放在select里通过shutDown这个管道来强制它退出
-			// 		indexer.addDoc(doc)
-			// 	case <-indexer.shutDown:
-			// 		indexer.shutDown <- true
-			// 		stop = true
-			// 	}
-			// }
 		}()
 	}
 
@@ -196,17 +183,6 @@ func (indexer *Indexer) Init(options types.IndexerOpts) {
 					break
 				}
 			}
-
-			// stop := false
-			// for !stop {
-			// 	select {
-			// 	case docId := <-indexer.deleteChannel: //如果deleteChannel已空，该行代码会一直阻塞，所以放在select里通过shutDown这个管道来强制它退出
-			// 		indexer.deleteDoc(docId)
-			// 	case <-indexer.shutDown:
-			// 		indexer.shutDown <- true
-			// 		stop = true
-			// 	}
-			// }
 		}()
 	}
 	indexer.stoped = false
