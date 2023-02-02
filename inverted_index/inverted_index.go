@@ -162,6 +162,7 @@ func (indexer *Indexer) Init(options types.IndexerOpts) {
 	//启动addDoc的消费线程
 	for i := 0; i < options.AddDocThreads; i++ {
 		go func() {
+			defer indexer.addRoutineFinished.Done()
 			for {
 				if doc, ok := <-indexer.addChannel; ok {
 					indexer.addDoc(doc)
@@ -170,7 +171,7 @@ func (indexer *Indexer) Init(options types.IndexerOpts) {
 				}
 
 			}
-			// defer indexer.addRoutineFinished.Done()
+
 			// stop := false
 			// for !stop {
 			// 	select {
@@ -187,6 +188,7 @@ func (indexer *Indexer) Init(options types.IndexerOpts) {
 	//启动deleteDoc的消费线程
 	for i := 0; i < options.DeleteDocThreads; i++ {
 		go func() {
+			defer indexer.delRoutineFinished.Done()
 			for {
 				if docId, ok := <-indexer.deleteChannel; ok {
 					indexer.deleteDoc(docId)
@@ -194,7 +196,7 @@ func (indexer *Indexer) Init(options types.IndexerOpts) {
 					break
 				}
 			}
-			// defer indexer.delRoutineFinished.Done()
+
 			// stop := false
 			// for !stop {
 			// 	select {
