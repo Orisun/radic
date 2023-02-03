@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"path"
@@ -204,7 +203,7 @@ func (s *Rocksdb) IterDB(fn func(k, v []byte) error) int64 {
 	iter := s.db.NewIterator(readOptions)
 	defer iter.Close()
 	for iter.SeekToFirst(); iter.Valid(); iter.Next() {
-		fmt.Println("next")
+		// fmt.Println("next")
 		//k := make([]byte, 4)
 		//copy(k, iter.Key().Data())
 		//value := iter.Value().Data()
