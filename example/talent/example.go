@@ -64,8 +64,7 @@ func main() {
 		DbType:                "badger",
 		AddDocThreads:         8,
 		DeleteDocThreads:      4,
-		PreRankCriteria:       ManualRankCriteria{},
-		MaxRetrieve:           2, //搜索时最多返回2条结果
+		MaxRetrieve:           2, //搜索时最多返回2条结果。RankScore最小有会被丢弃
 	}
 	engine := radic.IndexEngine{}
 	engine.Start(options)
@@ -98,13 +97,13 @@ func main() {
 	docInfo1 := types.DocInfo{
 		DocId:     uint32(talent1.Id),
 		Keyword:   []*types.Keyword{kw1, kw2, kw3},
-		RankScore: 5,
+		RankScore: 15,
 		Entry:     talent1.Serialize(),
 	}
 	docInfo2 := types.DocInfo{
 		DocId:     uint32(talent2.Id),
 		Keyword:   []*types.Keyword{kw1, kw4, kw5, kw6},
-		RankScore: 8,
+		RankScore: 8, //它是三者当中RankScore最小的
 		Entry:     talent2.Serialize(),
 	}
 	docInfo3 := types.DocInfo{

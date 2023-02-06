@@ -11,12 +11,12 @@ const (
 	nil_keyword = "nil"
 )
 
-//DocInfo 往索引里添加文档时需要准确好这些字段，这也是正排索引上需要存储的信息
+// DocInfo 往索引里添加文档时需要准确好这些字段，这也是正排索引上需要存储的信息
 type DocInfo struct {
 	DocId            uint32
 	CompositeFeature uint32     //32个bit分别对应32个bool属性
 	Keyword          []*Keyword //倒排索引的key
-	RankScore        float32    //作为PreRankCriteria的输入参数，PreRankCriteria的输出是截断前排序的依据
+	RankScore        float32    //如果倒排链太长，需要截断时排序的依据
 	Entry            []byte     //正排详情，自行做序列化
 }
 
@@ -54,13 +54,13 @@ func NewKeyword(ser string) *Keyword {
 	}
 }
 
-//ScoredDoc 参与排序的文档
+// ScoredDoc 参与排序的文档
 type ScoredDoc struct {
 	DocId     uint32
 	RankScore float32
 }
 
-//ScoredDocs 给文档排序
+// ScoredDocs 给文档排序
 type ScoredDocs []ScoredDoc
 
 func (docs ScoredDocs) Len() int {
@@ -84,7 +84,7 @@ func (doc ScoredDoc) Less(other ScoredDoc) bool {
 	}
 }
 
-//TopK 把最大的前K个元素放在前K个位置
+// TopK 把最大的前K个元素放在前K个位置
 func (docs ScoredDocs) TopK(k int) {
 	docs.topK(k, 0, docs.Len())
 }

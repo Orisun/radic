@@ -66,7 +66,7 @@ type Indexer struct {
 	traverseResultPool sync.Pool //每次遍历倒排链时都创建一个临时数组，以容纳遍历的结果，造成GC时间较长。所以采用对象池进行优化
 }
 
-//Close 关闭local db，释放倒排索引所占的内存
+// Close 关闭local db，释放倒排索引所占的内存
 func (indexer *Indexer) Close() {
 	if !indexer.initialized {
 		log.Printf("indexer have not initialized")
@@ -104,7 +104,7 @@ func (indexer *Indexer) Close() {
 	log.Printf("close all local db")
 }
 
-//Init 初始化参数
+// Init 初始化参数
 func (indexer *Indexer) Init(options types.IndexerOpts) {
 	if indexer.initialized {
 		return
@@ -138,9 +138,7 @@ func (indexer *Indexer) Init(options types.IndexerOpts) {
 	indexer.addChannel = make(chan types.DocInfo, options.AddCacheSize)
 	indexer.deleteChannel = make(chan uint32, options.DeleteCacheSize)
 	indexer.toBeDeleteBuffer = util.NewConcurrentMapString(8)
-	if indexer.initOptions.PreRankCriteria != nil { //如果没有指定PreRankCriteria，则不需要用到indexer.docScores缓存
-		indexer.docScores = util.NewConcurrentMapUint32(32)
-	}
+	indexer.docScores = util.NewConcurrentMapUint32(32)
 	// indexer.shutDown = make(chan bool, 2*(options.AddDocThreads+options.DeleteDocThreads))
 	indexer.addRoutineFinished = sync.WaitGroup{}
 	indexer.addRoutineFinished.Add(options.AddDocThreads)
@@ -204,20 +202,20 @@ func (indexer *Indexer) getIndexId(key string) uint64 {
 	return indexId
 }
 
-//getStorageKey
+// getStorageKey
 func (indexer *Indexer) getStorageKey(docId uint32) []byte {
 	key := make([]byte, 8)
 	cnt := binary.PutUvarint(key, uint64(docId))
 	return key[:cnt]
 }
 
-//storageKey2DocId 与getStorageKey互为逆操作
+// storageKey2DocId 与getStorageKey互为逆操作
 func (indexer *Indexer) storageKey2DocId(key []byte) uint32 {
 	num, _ := binary.Uvarint(key)
 	return uint32(num)
 }
 
-//IterIndex 遍历索引里的数据
+// IterIndex 遍历索引里的数据
 func (indexer *Indexer) IterIndex(fn func(docId uint32, docInfo types.DocInfo) error) {
 	if indexer.stoped {
 		log.Printf("index engine is stopped")
@@ -240,7 +238,7 @@ func (indexer *Indexer) IterIndex(fn func(docId uint32, docInfo types.DocInfo) e
 	}
 }
 
-//IterKeyOnIndex 遍历索引里的key
+// IterKeyOnIndex 遍历索引里的key
 func (indexer *Indexer) IterKeyOnIndex(fn func(docId uint32) error) error {
 	if indexer.stoped {
 		log.Printf("index engine is stopped")
@@ -334,7 +332,7 @@ func (indexer *Indexer) AddToLocalDB(doc *types.DocInfo) {
 	}
 }
 
-//DocNum 索引中的文档总数。若indexer.initOptions.PreRankCriteria为nil，则返回-1
+// DocNum 索引中的文档总数
 func (indexer *Indexer) DocNum() int {
 	if indexer.stoped {
 		log.Printf("index engine is stopped")
@@ -513,7 +511,7 @@ func (indexer *Indexer) deleteDoc(docId uint32) {
 //	return indexer.toBeDeleteBuffer.Has(strconv.FormatUint(uint64(docId), 10))
 //}
 
-//AddDeletePair 从倒排索引的一个key上把指定docID删掉。这是异步执行的，积累到一定量才会真正执行
+// AddDeletePair 从倒排索引的一个key上把指定docID删掉。这是异步执行的，积累到一定量才会真正执行
 func (indexer *Indexer) AddDeletePair(docId uint32, word *types.Keyword) {
 	if indexer.stoped {
 		log.Printf("index engine is stopped")
@@ -535,7 +533,7 @@ func (indexer *Indexer) AddDeletePair(docId uint32, word *types.Keyword) {
 	}
 }
 
-//IndexDoc 往索引上添加一个doc。该操作中异步执行的
+// IndexDoc 往索引上添加一个doc。该操作中异步执行的
 func (indexer *Indexer) IndexDoc(doc types.DocInfo) {
 	if indexer.stoped {
 		log.Printf("index engine is stopped")
@@ -546,7 +544,7 @@ func (indexer *Indexer) IndexDoc(doc types.DocInfo) {
 	indexer.addChannel <- doc
 }
 
-//RemoveDoc 从索引上删除doc。该操作中异步执行的
+// RemoveDoc 从索引上删除doc。该操作中异步执行的
 func (indexer *Indexer) RemoveDoc(docId uint32) {
 	if indexer.stoped {
 		log.Printf("index engine is stopped")
@@ -557,7 +555,7 @@ func (indexer *Indexer) RemoveDoc(docId uint32) {
 	indexer.deleteChannel <- docId
 }
 
-//Lookup 根据条件去索引上搜索doc
+// Lookup 根据条件去索引上搜索doc
 func (indexer *Indexer) Lookup(must []*types.Keyword, should []*types.Keyword, not []*types.Keyword, orderLess bool, filterIds map[uint32]bool, onFlag uint32, offFlag uint32, orFlags []uint32) []*types.DocInfo {
 	if indexer.stoped {
 		log.Printf("index engine is stopped")
@@ -661,14 +659,14 @@ func (indexer *Indexer) Lookup(must []*types.Keyword, should []*types.Keyword, n
 
 		//量太大，到search层精排序容易超时，强制截断，同时也减小了网络开销
 		if len(idList) > indexer.initOptions.MaxRetrieve {
-			if indexer.docScores != nil && indexer.initOptions.PreRankCriteria != nil {
+			if indexer.docScores != nil {
 				//截断前要先按preScore排序，保证截取的是得分最高的那一部分
 				ranks := make(types.ScoredDocs, 0, len(intersect))
 				for _, docId := range idList {
 					if score, e2 := indexer.docScores.Get(docId); e2 {
 						rs := types.ScoredDoc{
 							DocId:     docId,
-							RankScore: indexer.initOptions.PreRankCriteria.Score(score.(float32)),
+							RankScore: score.(float32),
 						}
 						ranks = append(ranks, rs)
 					}
@@ -712,7 +710,7 @@ func (indexer *Indexer) Lookup(must []*types.Keyword, should []*types.Keyword, n
 	}
 }
 
-//GetInvertListLen 获取倒排链的长度
+// GetInvertListLen 获取倒排链的长度
 func (indexer *Indexer) GetInvertListLen(keyword *types.Keyword, onFlag uint32, offFlag uint32, orFlags []uint32) int32 {
 	key := keyword.ToString()
 	indexId := indexer.getIndexId(key)
@@ -746,7 +744,7 @@ func (indexer *Indexer) GetInvertListLen(keyword *types.Keyword, onFlag uint32, 
 	}
 }
 
-//mustFind 关键词必须都命中
+// mustFind 关键词必须都命中
 func (indexer *Indexer) mustFind(words []*types.Keyword, filterIds map[uint32]bool, onFlag uint32, offFlag uint32, orFlags []uint32) map[uint32]bool {
 	if len(words) == 0 {
 		return nil
@@ -838,7 +836,7 @@ func (indexer *Indexer) mustFind(words []*types.Keyword, filterIds map[uint32]bo
 	return rect
 }
 
-//traverseInvertList 遍历单条倒排链，取下满足onFlag、offFlag和orFlags的元素。返回的数组用完后注意归还给traverseResultPool
+// traverseInvertList 遍历单条倒排链，取下满足onFlag、offFlag和orFlags的元素。返回的数组用完后注意归还给traverseResultPool
 func (indexer *Indexer) traverseInvertList(arr []uint64, onFlag uint32, offFlag uint32, orFlags []uint32) []uint32 {
 	rect := indexer.traverseResultPool.Get().([]uint32)
 	segCount := (len(arr) + INVERTED_SEG_LEN - 1) / INVERTED_SEG_LEN
@@ -878,7 +876,7 @@ func (indexer *Indexer) traverseInvertList(arr []uint64, onFlag uint32, offFlag 
 	return rect //rect用完后注意归还给traverseResultPool
 }
 
-//shouldFind 命中一个关键词即可
+// shouldFind 命中一个关键词即可
 func (indexer *Indexer) shouldFind(words []*types.Keyword, filterIds map[uint32]bool, onFlag uint32, offFlag uint32, orFlags []uint32) map[uint32]bool {
 	if len(words) == 0 {
 		return nil
@@ -934,7 +932,7 @@ func (indexer *Indexer) shouldFind(words []*types.Keyword, filterIds map[uint32]
 	return rect
 }
 
-//CleanToBeDeleteBuffer 把toBeDeleteBuffer里需要删的doc从倒排索引上删除，同时也从toBeDeleteBuffer里删除
+// CleanToBeDeleteBuffer 把toBeDeleteBuffer里需要删的doc从倒排索引上删除，同时也从toBeDeleteBuffer里删除
 func (indexer *Indexer) CleanToBeDeleteBuffer() {
 	if indexer.stoped {
 		log.Printf("index engine is stopped")
@@ -1002,7 +1000,7 @@ func (indexer *Indexer) CleanToBeDeleteBuffer() {
 	}
 }
 
-//GetDoc 根据ID获取一个doc的详情。flag=1仅获取detail，flag=0都获取
+// GetDoc 根据ID获取一个doc的详情。flag=1仅获取detail，flag=0都获取
 func (indexer *Indexer) GetDoc(docId uint32, flag int) *types.DocInfo {
 	if indexer.stoped {
 		log.Printf("index engine is stopped")
@@ -1051,7 +1049,7 @@ func (indexer *Indexer) GetDoc(docId uint32, flag int) *types.DocInfo {
 	return &data
 }
 
-//GetDocs 根据ID获取一批doc的详情
+// GetDocs 根据ID获取一批doc的详情
 func (indexer *Indexer) GetDocs(docIds []uint32) []*types.DocInfo {
 	if indexer.stoped {
 		log.Printf("index engine is stopped")
@@ -1250,7 +1248,7 @@ func (indexer *Indexer) QuickLoadDataFromDb2InvertIndex() int {
 	return t
 }
 
-//InvertIndexStatistics 统计倒排索引上每个关键词下面有几个docID，给indexer.invertListLen赋值，返回倒排链的总数
+// InvertIndexStatistics 统计倒排索引上每个关键词下面有几个docID，给indexer.invertListLen赋值，返回倒排链的总数
 func (indexer *Indexer) InvertIndexStatistics(outfile string) int {
 	if indexer.stoped {
 		log.Printf("index engine is stopped")
