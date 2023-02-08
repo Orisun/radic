@@ -61,7 +61,7 @@ func main() {
 		ForwardIndexSize:      100000,
 		DbShardNum:            8,
 		DbPath:                "db",
-		DbType:                "badger",
+		DbType:                "rocksdb",
 		AddDocThreads:         8,
 		DeleteDocThreads:      4,
 		MaxRetrieve:           2, //搜索时最多返回2条结果。RankScore最小有会被丢弃

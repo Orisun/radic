@@ -10,7 +10,7 @@ import (
 	"github.com/Orisun/radic/types"
 )
 
-//Book 以图书搜索为例
+// Book 以图书搜索为例
 type Book struct {
 	Id      uint32
 	Name    string
@@ -18,7 +18,7 @@ type Book struct {
 	Chinese bool //是否为汉语版
 }
 
-//Serialize 图书序列化。序列化和反序列化由调用方决定，这不是radic负责的范畴。
+// Serialize 图书序列化。序列化和反序列化由调用方决定，这不是radic负责的范畴。
 func (book *Book) Serialize() []byte {
 	var value bytes.Buffer
 	encoder := gob.NewEncoder(&value) //gob是go自带的序列化方法，当然也可以用protobuf等其它方式
@@ -31,7 +31,7 @@ func (book *Book) Serialize() []byte {
 	}
 }
 
-//DeserializeBook  图书反序列化
+// DeserializeBook  图书反序列化
 func DeserializeBook(v []byte) *Book {
 	buf := bytes.NewReader(v)
 	dec := gob.NewDecoder(buf)
@@ -57,7 +57,7 @@ func main() {
 		ForwardIndexSize:      100000,
 		DbShardNum:            8,
 		DbPath:                "db",
-		DbType:                "badger",
+		DbType:                "rocksdb",
 		AddDocThreads:         8,
 		DeleteDocThreads:      4,
 	}
