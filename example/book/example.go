@@ -57,7 +57,7 @@ func main() {
 		ForwardIndexSize:      100000,
 		DbShardNum:            8,
 		DbPath:                "db",
-		DbType:                "rocksdb",
+		DbType:                "badger",
 		AddDocThreads:         8,
 		DeleteDocThreads:      4,
 	}
