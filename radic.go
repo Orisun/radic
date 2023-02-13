@@ -78,12 +78,12 @@ func (engine *IndexEngine) Search(request types.SearchRequest) types.SearchResp 
 	return resp
 }
 
-// IterIndex 遍历索引里的数据
+// IterIndex 遍历索引里的数据。调用前提是正排索引要先Close掉
 func (engine *IndexEngine) IterIndex(fn func(docId uint32, docInfo types.DocInfo) error) {
 	engine.indexer.IterIndex(fn)
 }
 
-// IterKeyOnIndex 遍历索引里的key
+// IterKeyOnIndex 遍历索引里的key。调用前提是正排索引要先Close掉
 func (engine *IndexEngine) IterKeyOnIndex(fn func(docId uint32) error) error {
 	return engine.indexer.IterKeyOnIndex(fn)
 }

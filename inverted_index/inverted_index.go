@@ -215,7 +215,7 @@ func (indexer *Indexer) storageKey2DocId(key []byte) uint32 {
 	return uint32(num)
 }
 
-// IterIndex 遍历索引里的数据
+// IterIndex 遍历索引里的数据。调用前提是正排索引要先Close掉
 func (indexer *Indexer) IterIndex(fn func(docId uint32, docInfo types.DocInfo) error) {
 	if indexer.stoped {
 		log.Printf("index engine is stopped")
@@ -238,7 +238,7 @@ func (indexer *Indexer) IterIndex(fn func(docId uint32, docInfo types.DocInfo) e
 	}
 }
 
-// IterKeyOnIndex 遍历索引里的key
+// IterKeyOnIndex 遍历索引里的key。调用前提是正排索引要先Close掉
 func (indexer *Indexer) IterKeyOnIndex(fn func(docId uint32) error) error {
 	if indexer.stoped {
 		log.Printf("index engine is stopped")
