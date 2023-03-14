@@ -104,8 +104,8 @@ func (engine *IndexEngine) LoadDataFromDb2InvertIndex() int {
 }
 
 // QuickLoadDataFromDb2InvertIndex 从本地db加载数据，加到倒排索引中。仅支持在系统启动时一次性调用
-func (engine *IndexEngine) QuickLoadDataFromDb2InvertIndex() int {
-	return engine.indexer.QuickLoadDataFromDb2InvertIndex()
+func (engine *IndexEngine) QuickLoadDataFromDb2InvertIndex(concurrency int) int {
+	return engine.indexer.QuickLoadDataFromDb2InvertIndex(concurrency)
 }
 
 // DocNum 索引上的文档总数

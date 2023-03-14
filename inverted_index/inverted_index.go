@@ -1180,7 +1180,7 @@ func (indexer *Indexer) LoadDataFromDb2InvertIndex() int {
 	return t
 }
 
-func (indexer *Indexer) QuickLoadDataFromDb2InvertIndex() int {
+func (indexer *Indexer) QuickLoadDataFromDb2InvertIndex(concurrency int) int {
 	if indexer.stoped {
 		log.Printf("index engine is stopped")
 		return 0
@@ -1189,52 +1189,59 @@ func (indexer *Indexer) QuickLoadDataFromDb2InvertIndex() int {
 	defer indexer.taskCount.Done()
 	var total int32
 	wg := sync.WaitGroup{}
-	wg.Add(len(indexer.dbs) / 2)
-	for i := 0; i < indexer.initOptions.DbShardNum; i++ {
-		go func(i int) { //并行加载db会非常耗内存
+	wg.Add(concurrency)
+	var shardIndex int32 = -1
+	for j := 0; j < concurrency; j++ { //并行加载db会非常耗内存
+		go func() {
 			defer wg.Done()
-			detailDB := indexer.dbs[i]
-			keysDB := indexer.dbs[i+indexer.initOptions.DbShardNum]
-			cnt := 0
-			detailReader := bytes.NewReader([]byte{})
-			keyReader := bytes.NewReader([]byte{})
-			detailDB.IterDB(func(k, v []byte) error {
-				cnt++
-				detailReader.Reset(v)
-				detailDecoder := gob.NewDecoder(detailReader)
-				var data types.DocInfo
-				err := detailDecoder.Decode(&data)
-				if err == nil {
-					storageKey := indexer.getStorageKey(data.DocId)
-					if keyBytes, err2 := keysDB.Get(storageKey); err2 == nil {
-						if len(keyBytes) > 0 {
-							keyReader.Reset(keyBytes)
-							keysDecoder := gob.NewDecoder(keyReader)
-							var keyDoc []*types.Keyword
-							err3 := keysDecoder.Decode(&keyDoc)
-							if err3 == nil {
-								data.Keyword = keyDoc
-								indexer.addDocInner(data, false)
-								atomic.AddInt32(&total, 1)
-								if atomic.LoadInt32(&total)%100000 == 0 {
-									log.Printf("load %d docs from local db to inverted index", atomic.LoadInt32(&total))
+			for {
+				i := int(atomic.AddInt32(&shardIndex, 1))
+				if i >= indexer.initOptions.DbShardNum {
+					break
+				}
+				detailDB := indexer.dbs[i]
+				keysDB := indexer.dbs[i+indexer.initOptions.DbShardNum]
+				cnt := 0
+				detailReader := bytes.NewReader([]byte{})
+				keyReader := bytes.NewReader([]byte{})
+				detailDB.IterDB(func(k, v []byte) error {
+					cnt++
+					detailReader.Reset(v)
+					detailDecoder := gob.NewDecoder(detailReader)
+					var data types.DocInfo
+					err := detailDecoder.Decode(&data)
+					if err == nil {
+						storageKey := indexer.getStorageKey(data.DocId)
+						if keyBytes, err2 := keysDB.Get(storageKey); err2 == nil {
+							if len(keyBytes) > 0 {
+								keyReader.Reset(keyBytes)
+								keysDecoder := gob.NewDecoder(keyReader)
+								var keyDoc []*types.Keyword
+								err3 := keysDecoder.Decode(&keyDoc)
+								if err3 == nil {
+									data.Keyword = keyDoc
+									indexer.addDocInner(data, false)
+									atomic.AddInt32(&total, 1)
+									if atomic.LoadInt32(&total)%100000 == 0 {
+										log.Printf("load %d docs from local db to inverted index", atomic.LoadInt32(&total))
+									}
+								} else {
+									log.Printf("decode key doc of %d failed", data.DocId)
 								}
 							} else {
-								log.Printf("decode key doc of %d failed", data.DocId)
+								log.Printf("keys of %d not in local db", data.DocId)
 							}
 						} else {
 							log.Printf("keys of %d not in local db", data.DocId)
 						}
 					} else {
-						log.Printf("keys of %d not in local db", data.DocId)
+						log.Printf("decode detail doc failed")
 					}
-				} else {
-					log.Printf("decode detail doc failed")
-				}
-				return err
-			})
-			log.Printf("%d docs in %d db", cnt, i)
-		}(i)
+					return err
+				})
+				log.Printf("%d docs in %d db", cnt, i)
+			}
+		}()
 	}
 	wg.Wait()
 
