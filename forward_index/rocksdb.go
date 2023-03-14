@@ -236,3 +236,13 @@ func (s *Rocksdb) Close() error {
 	s.db.Close()
 	return nil
 }
+
+/**
+git checkout -b quick_load_index rocksdbV1.0
+git merge master
+// 修改代码
+git add .
+git commit -m""
+git tag -a rocksdbV1.1 -m"加载索引指定并发度"
+git push origin rocksdbV1.1
+*/
