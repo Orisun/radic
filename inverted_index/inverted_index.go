@@ -729,6 +729,7 @@ func (indexer *Indexer) GetInvertListLen(keyword *types.Keyword, onFlag uint32, 
 					for _, orFlag := range orFlags {
 						if orFlag > 0 && flag&orFlag <= 0 {
 							orOk = false
+							break
 						}
 					}
 					if orOk {
@@ -856,6 +857,7 @@ func (indexer *Indexer) traverseInvertList(arr []uint64, onFlag uint32, offFlag 
 					for _, orFlag := range orFlags {
 						if orFlag > 0 && flag&orFlag <= 0 {
 							orOk = false
+							break
 						}
 					}
 					if orOk {
