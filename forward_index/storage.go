@@ -6,9 +6,9 @@ package storage
 import "fmt"
 
 var storageOpenFunction = map[string]func(path string) (Storage, error){
-	"badger": OpenBadger,
-	"bolt":   OpenBolt,
-	// "rocksdb": OpenRocksdb,
+	"badger":  OpenBadger,
+	"bolt":    OpenBolt,
+	"rocksdb": OpenRocksdb,
 }
 
 type Storage interface {
