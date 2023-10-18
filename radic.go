@@ -156,3 +156,13 @@ func (engine *IndexEngine) GetInvertListLen(keyword *types.Keyword, onFlag uint3
 //func (engine *IndexEngine) UpdateForwardIndex(doc *types.DocInfo) {
 //	engine.indexer.UpdateDetail(doc)
 //}
+
+/**
+git checkout -b b14 rocksdbV1.4
+git merge master
+// 修改代码
+git add .
+git commit -m"加日志"
+git tag -a rocksdbV1.5 -m"加日志"
+git push origin rocksdbV1.5
+*/
