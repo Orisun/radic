@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"fmt"
+	"log"
 	"math"
 	"os"
 	"path"
@@ -22,8 +23,6 @@ import (
 	"github.com/Orisun/radic/types"
 	"github.com/Orisun/radic/util"
 	"github.com/Orisun/radic/util/inmem"
-
-	"log"
 
 	"github.com/cespare/xxhash"
 )
@@ -322,9 +321,13 @@ func (indexer *Indexer) AddToLocalDB(doc *types.DocInfo) {
 
 		var value2 bytes.Buffer
 		encoder2 := gob.NewEncoder(&value2)
-		if err := encoder2.Encode(keys); err == nil {
+		if err = encoder2.Encode(keys); err == nil {
 			keysDB := indexer.dbs[shardId2]
-			keysDB.Set(storageKey, value2.Bytes())
+			if err = keysDB.Set(storageKey, value2.Bytes()); err != nil {
+				log.Printf("store to local db failed: %s", err)
+			}
+		} else {
+			log.Printf("gob encode doc failed: %s", err)
 		}
 		atomic.AddUint64(&indexer.totalDocs, 1)
 	} else {
