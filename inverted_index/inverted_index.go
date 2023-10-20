@@ -304,7 +304,7 @@ func (indexer *Indexer) AddToInvertIndex(keywords []*types.Keyword, doc *types.D
 		}
 		indexer.invertedTableLocks[indexId].Unlock()
 	}
-	log.Printf("add doc %d to invert index", doc.DocId) //TODO
+	// log.Printf("add doc %d to invert index", doc.DocId)
 }
 
 func (indexer *Indexer) AddToLocalDB(doc *types.DocInfo) {
@@ -318,7 +318,7 @@ func (indexer *Indexer) AddToLocalDB(doc *types.DocInfo) {
 		detailDB := indexer.dbs[shardId1]
 		storageKey := indexer.getStorageKey(doc.DocId)
 		detailDB.Set(storageKey, value.Bytes())
-		log.Printf("add doc %d to shard %d %d\n", doc.DocId, shardId1, shardId2) //TODO
+		// log.Printf("add doc %d to shard %d %d\n", doc.DocId, shardId1, shardId2)
 
 		var value2 bytes.Buffer
 		encoder2 := gob.NewEncoder(&value2)

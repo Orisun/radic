@@ -162,7 +162,7 @@ git checkout -b b14 rocksdbV1.4
 git merge master
 // 修改代码
 git add .
-git commit -m"不依赖rocksdb"
-git tag -a rocksdbV1.5 -m"不依赖rocksdb"
-git push origin rocksdbV1.5
+git commit -m"不依赖rocksdb,加日志"
+git tag -a rocksdbV1.7 -m"不依赖rocksdb,加日志"
+git push origin rocksdbV1.7
 */
