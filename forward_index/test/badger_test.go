@@ -8,11 +8,12 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"fmt"
-	storage "github.com/Orisun/radic/forward_index"
-	"github.com/Orisun/radic/types"
-	"log"
 	"os"
 	"testing"
+
+	storage "github.com/Orisun/radic/forward_index"
+	"github.com/Orisun/radic/types"
+	"github.com/Orisun/radic/util"
 )
 
 var (
@@ -23,7 +24,7 @@ func Init2() {
 	var err error
 	if badgerDB, err = storage.OpenStorage("badger", "dbs"); err == nil {
 		if badgerDB == nil {
-			log.Printf("open storage failed")
+			util.Log.Printf("open storage failed")
 			os.Exit(1)
 		}
 	} else {
@@ -214,7 +215,7 @@ func TestBadgerGetSet(t *testing.T) {
 	}
 }
 
-//getStorageKey
+// getStorageKey
 func getStorageKey(docId uint32) []byte {
 	key := make([]byte, 8)
 	cnt := binary.PutUvarint(key, uint64(docId))

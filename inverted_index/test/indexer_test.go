@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	core "github.com/Orisun/radic/inverted_index"
 	"github.com/Orisun/radic/types"
@@ -220,10 +221,10 @@ func TestAddLookup(t *testing.T) {
 
 	indexer.RemoveDoc(uint32(talent1.Id))
 	indexer.RemoveDoc(uint32(talent2.Id))
-	//time.Sleep(1000 * time.Millisecond) //稍等一会儿，等Delete操作执行完成
+	time.Sleep(100 * time.Millisecond) //稍等一会儿，等Delete操作执行完成
 	indexer.Lookup(must, should, not, false, nil, onFlag, offFlag, orFlags)
-	fmt.Println("把待删除的彻底删除")
-	indexer.CleanToBeDeleteBuffer()
+	// fmt.Println("把待删除的彻底删除")
+	// indexer.CleanToBeDeleteBuffer()
 	results = indexer.Lookup(must, should, not, false, nil, onFlag, offFlag, orFlags)
 	if len(results) == 0 {
 		fmt.Println("没有搜索结果")
@@ -270,3 +271,5 @@ func TestVint(t *testing.T) {
 func TestClose(t *testing.T) {
 
 }
+
+// go test -v .\inverted_index\test\

@@ -122,13 +122,13 @@ package storage
 // 		atomic.StoreInt32(&s.load, 0)
 // 	} else {
 // 		if atomic.LoadInt32(&s.load) > 90000 { //1分钟单个DB读取docs数超过90000就拒绝任何请求
-// 			log.Println("rocks overload reject any request")
+// 			util.Log.Println("rocks overload reject any request")
 // 			RealReadCount = 0
 // 		} else if atomic.LoadInt32(&s.load) > 60000 { //1分钟单个DB读取docs数超过60000就只读20%
-// 			log.Println("rocks overload reject 80% request")
+// 			util.Log.Println("rocks overload reject 80% request")
 // 			RealReadCount = ReadCount / 5
 // 		} else if atomic.LoadInt32(&s.load) > 30000 { //1分钟单个DB读取docs数超过30000就只读50%
-// 			log.Println("rocks overload reject 50% request")
+// 			util.Log.Println("rocks overload reject 50% request")
 // 			RealReadCount = ReadCount / 2
 // 		}
 // 	}

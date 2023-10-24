@@ -5,11 +5,11 @@ package storage
 
 import (
 	"errors"
-	"log"
 	"os"
 	"path"
 	"sync/atomic"
 
+	"github.com/Orisun/radic/util"
 	"github.com/dgraph-io/badger"
 	"github.com/dgraph-io/badger/options"
 )
@@ -66,13 +66,13 @@ func (s *Badger) CheckAndGC() {
 	}
 	lsmSize2, vlogSize2 := s.db.Size()
 	if vlogSize2 < vlogSize1 {
-		log.Printf("badger before GC, LSM %d, vlog %d. after GC, LSM %d, vlog %d", lsmSize1, vlogSize1, lsmSize2, vlogSize2)
+		util.Log.Printf("badger before GC, LSM %d, vlog %d. after GC, LSM %d, vlog %d", lsmSize1, vlogSize1, lsmSize2, vlogSize2)
 	} else {
-		log.Printf("collect zero garbage")
+		util.Log.Printf("collect zero garbage")
 	}
 }
 
-//Set 为单个写操作开一个事务
+// Set 为单个写操作开一个事务
 func (s *Badger) Set(k, v []byte) error {
 	err := s.db.Update(func(txn *badger.Txn) error { //db.Update相当于打开了一个读写事务:db.NewTransaction(true)。用db.Update的好处在于不用显式调用Txn.Commit()了
 		//duration := time.Hour * 87600
@@ -81,7 +81,7 @@ func (s *Badger) Set(k, v []byte) error {
 	return err
 }
 
-//BatchSet 多个写操作使用一个事务
+// BatchSet 多个写操作使用一个事务
 func (s *Badger) BatchSet(keys, values [][]byte) error {
 	if len(keys) != len(values) {
 		return errors.New("key value not the same length")
@@ -91,7 +91,7 @@ func (s *Badger) BatchSet(keys, values [][]byte) error {
 	for i, key := range keys {
 		value := values[i]
 		//duration := time.Hour * 87600
-		//util.Log.Debugf("duration",duration)
+		//util.util.Log.Debugf("duration",duration)
 		if err = txn.Set(key, value); err != nil {
 			_ = txn.Commit() //发生异常时就提交老事务，然后开一个新事务，重试set
 			txn = s.db.NewTransaction(true)
@@ -102,7 +102,7 @@ func (s *Badger) BatchSet(keys, values [][]byte) error {
 	return err
 }
 
-//Get 如果key不存在会返回error:Key not found
+// Get 如果key不存在会返回error:Key not found
 func (s *Badger) Get(k []byte) ([]byte, error) {
 	var ival []byte
 	err := s.db.View(func(txn *badger.Txn) error { //db.View相当于打开了一个读写事务:db.NewTransaction(true)。用db.Update的好处在于不用显式调用Txn.Discard()了
@@ -121,7 +121,7 @@ func (s *Badger) Get(k []byte) ([]byte, error) {
 	return ival, err
 }
 
-//BatchGet 返回的values与传入的keys顺序保持一致。如果key不存在或读取失败则对应的value是空数组
+// BatchGet 返回的values与传入的keys顺序保持一致。如果key不存在或读取失败则对应的value是空数组
 func (s *Badger) BatchGet(keys [][]byte) ([][]byte, error) {
 	var err error
 	txn := s.db.NewTransaction(false) //只读事务
@@ -154,7 +154,7 @@ func (s *Badger) BatchGet(keys [][]byte) ([][]byte, error) {
 	return values, err
 }
 
-//Delete
+// Delete
 func (s *Badger) Delete(k []byte) error {
 	err := s.db.Update(func(txn *badger.Txn) error {
 		return txn.Delete(k)
@@ -162,7 +162,7 @@ func (s *Badger) Delete(k []byte) error {
 	return err
 }
 
-//BatchDelete
+// BatchDelete
 func (s *Badger) BatchDelete(keys [][]byte) error {
 	var err error
 	txn := s.db.NewTransaction(true)
@@ -177,7 +177,7 @@ func (s *Badger) BatchDelete(keys [][]byte) error {
 	return err
 }
 
-//Has 判断某个key是否存在
+// Has 判断某个key是否存在
 func (s *Badger) Has(k []byte) bool {
 	var exists = false
 	s.db.View(func(txn *badger.Txn) error { //db.View相当于打开了一个读写事务:db.NewTransaction(true)。用db.Update的好处在于不用显式调用Txn.Discard()了
@@ -192,7 +192,7 @@ func (s *Badger) Has(k []byte) bool {
 	return exists
 }
 
-//IterDB 遍历整个DB
+// IterDB 遍历整个DB
 func (s *Badger) IterDB(fn func(k, v []byte) error) int64 {
 	var total int64
 	s.db.View(func(txn *badger.Txn) error {
@@ -225,7 +225,7 @@ func (s *Badger) IterDB(fn func(k, v []byte) error) int64 {
 	return atomic.LoadInt64(&total)
 }
 
-//IterKey 只遍历key。key是全部存在LSM tree上的，只需要读内存，所以很快
+// IterKey 只遍历key。key是全部存在LSM tree上的，只需要读内存，所以很快
 func (s *Badger) IterKey(fn func(k []byte) error) int64 {
 	var total int64
 	s.db.View(func(txn *badger.Txn) error {
@@ -249,7 +249,7 @@ func (s *Badger) Size() (int64, int64) {
 	return s.db.Size()
 }
 
-//Close 把内存中的数据flush到磁盘，同时释放文件锁。如果没有close，再open时会丢失很多数据
+// Close 把内存中的数据flush到磁盘，同时释放文件锁。如果没有close，再open时会丢失很多数据
 func (s *Badger) Close() error {
 	return s.db.Close()
 }

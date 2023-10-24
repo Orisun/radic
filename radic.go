@@ -113,7 +113,7 @@ func (engine *IndexEngine) DocNum() int {
 	return engine.indexer.DocNum()
 }
 
-// DeleteFromInvertIndex 从倒排索引的一个key上把指定docID删掉。这是异步执行的，积累到一定量才会真正执行。彻底执行请调用FlushDeleteOnInvertedIndex
+// DeleteFromInvertIndex 从倒排索引的一个key上把指定docID删掉。这是异步执行的，会有毫秒级的延时
 func (engine *IndexEngine) DeleteFromInvertIndex(keyword *types.Keyword, docID uint32) {
 	engine.indexer.AddDeletePair(docID, keyword)
 }
@@ -129,9 +129,9 @@ func (engine *IndexEngine) AddToLocalDB(doc *types.DocInfo) {
 }
 
 // FlushDeleteOnInvertedIndex 需要从倒排索引上删除的docID，彻底将其删除
-func (engine *IndexEngine) FlushDeleteOnInvertedIndex() {
-	engine.indexer.CleanToBeDeleteBuffer()
-}
+// func (engine *IndexEngine) FlushDeleteOnInvertedIndex() {
+// 	engine.indexer.CleanToBeDeleteBuffer()
+// }
 
 // GetLocalDbPath 获取local db的路径
 func (engine *IndexEngine) GetLocalDbPath() string {
@@ -162,7 +162,7 @@ git checkout -b b14 rocksdbV1.4
 git merge master
 // 修改代码
 git add .
-git commit -m"不依赖rocksdb,加日志"
-git tag -a rocksdbV1.7 -m"不依赖rocksdb,加日志"
-git push origin rocksdbV1.7
+git commit -m"不依赖rocksdb"
+git tag -a rocksdbV1.9 -m"不依赖rocksdb"
+git push origin rocksdbV1.9
 */
