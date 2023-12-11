@@ -1,7 +1,4 @@
-// Date         : 2018/7/28
-// Author       : zhangchaoyang
-// Description  :
-package storage
+package forward_index
 
 import (
 	"errors"
@@ -9,9 +6,9 @@ import (
 	"path"
 	"sync/atomic"
 
-	"github.com/Orisun/radic/util"
-	"github.com/dgraph-io/badger"
-	"github.com/dgraph-io/badger/options"
+	"github.com/Orisun/radic/v2/util"
+	"github.com/dgraph-io/badger/v4"
+	"github.com/dgraph-io/badger/v4/options"
 )
 
 type Badger struct {

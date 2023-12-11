@@ -1,7 +1,4 @@
-// Date         : 2018/7/28
-// Author       : zhangchaoyang
-// Description  :
-package storage
+package forward_index
 
 import "fmt"
 

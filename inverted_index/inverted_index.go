@@ -23,7 +23,7 @@ import (
 	"github.com/Orisun/radic/util"
 	"github.com/Orisun/radic/util/inmem"
 
-	"github.com/cespare/xxhash"
+	xxhash "github.com/cespare/xxhash/v2"
 )
 
 const (

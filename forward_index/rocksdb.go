@@ -1,4 +1,4 @@
-package storage
+package forward_index
 
 import (
 	"os"
