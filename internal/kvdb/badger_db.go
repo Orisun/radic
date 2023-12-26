@@ -19,8 +19,8 @@ func (s *Badger) Open(DataDir string) error {
 	if err := os.MkdirAll(path.Dir(DataDir), os.ModePerm); err != nil { //如果DataDir对应的文件夹已存在则什么都不做，如果DataDir对应的文件已存在则返回错误
 		return err
 	}
-	option := badger.DefaultOptions(DataDir).WithNumVersionsToKeep(1) //Builder模式，可以连续使用多个With()函数来构造对象
-	db, err := badger.Open(option)                                    //文件只能被一个进程使用，如果不调用Close则下次无法Open。手动释放锁的办法：把LOCK文件删掉
+	option := badger.DefaultOptions(DataDir).WithNumVersionsToKeep(1).WithLoggingLevel(badger.ERROR) //Builder模式，可以连续使用多个With()函数来构造对象
+	db, err := badger.Open(option)                                                                   //文件只能被一个进程使用，如果不调用Close则下次无法Open。手动释放锁的办法：把LOCK文件删掉
 	if err != nil {
 		return err
 	} else {

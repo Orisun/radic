@@ -7,6 +7,8 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
+var NoDataErr = errors.New("no data")
+
 // Bolt bolt store struct
 type Bolt struct {
 	db     *bolt.DB
@@ -82,6 +84,9 @@ func (s *Bolt) Get(k []byte) ([]byte, error) {
 		ival = tx.Bucket(s.bucket).Get(k)
 		return nil
 	})
+	if len(ival) == 0 {
+		return nil, NoDataErr
+	}
 	return ival, err
 }
 
