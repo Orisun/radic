@@ -2,39 +2,40 @@ package test
 
 import (
 	"math/rand"
+	"strconv"
 	"sync"
 	"testing"
 
 	"github.com/Orisun/radic/v2/util"
 )
 
-var conMp = util.NewConcurrentHashMap[int64](8, 1000)
+var conMp = util.NewConcurrentHashMap(8, 1000)
 var synMp = sync.Map{}
 
 func readConMap() {
 	for i := 0; i < 1000; i++ {
-		key := rand.Int63()
+		key := strconv.Itoa(int(rand.Int63()))
 		conMp.Get(key)
 	}
 }
 
 func writeConMap() {
 	for i := 0; i < 1000; i++ {
-		key := rand.Int63()
+		key := strconv.Itoa(int(rand.Int63()))
 		conMp.Set(key, 1)
 	}
 }
 
 func readSynMap() {
 	for i := 0; i < 1000; i++ {
-		key := rand.Int63()
+		key := strconv.Itoa(int(rand.Int63()))
 		synMp.Load(key)
 	}
 }
 
 func writeSynMap() {
 	for i := 0; i < 1000; i++ {
-		key := rand.Int63()
+		key := strconv.Itoa(int(rand.Int63()))
 		synMp.Store(key, 1)
 	}
 }

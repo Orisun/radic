@@ -16,13 +16,19 @@ type Bolt struct {
 	bucket []byte
 }
 
+func (s *Bolt) WithDataPath(path string) *Bolt {
+	s.path = path
+	return s
+}
+
 func (s *Bolt) WithBucket(bucket string) *Bolt {
 	s.bucket = []byte(bucket)
 	return s
 }
 
 // OpenBolt open Bolt store
-func (s *Bolt) Open(DataDir string) error {
+func (s *Bolt) Open() error {
+	DataDir := s.GetDbPath()
 	db, err := bolt.Open(DataDir, 0o600, bolt.DefaultOptions)
 	if err != nil {
 		return err
@@ -36,7 +42,6 @@ func (s *Bolt) Open(DataDir string) error {
 		return err
 	} else {
 		s.db = db
-		s.path = DataDir
 		return nil
 	}
 }

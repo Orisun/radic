@@ -15,7 +15,13 @@ type Badger struct {
 	path string
 }
 
-func (s *Badger) Open(DataDir string) error {
+func (s *Badger) WithDataPath(path string) *Badger {
+	s.path = path
+	return s
+}
+
+func (s *Badger) Open() error {
+	DataDir := s.GetDbPath()
 	if err := os.MkdirAll(path.Dir(DataDir), os.ModePerm); err != nil { //如果DataDir对应的文件夹已存在则什么都不做，如果DataDir对应的文件已存在则返回错误
 		return err
 	}
@@ -25,7 +31,6 @@ func (s *Badger) Open(DataDir string) error {
 		return err
 	} else {
 		s.db = db
-		s.path = DataDir
 		return nil
 	}
 }

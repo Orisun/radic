@@ -1,20 +1,21 @@
-package query
+package types
 
-import "strings"
+import (
+	"strings"
+)
 
 type TermQuery struct {
-	Field   string
-	Keyword string
+	Keyword *Keyword
 	Must    []TermQuery
 	Should  []TermQuery
 }
 
 func NewTermQuery(field, keyword string) TermQuery {
-	return TermQuery{Field: field, Keyword: keyword}
+	return TermQuery{Keyword: &Keyword{Field: field, Word: keyword}} //TermQuery的一级成员里只有Field-keyword非空，Must和Should都为空
 }
 
 func (q TermQuery) Empty() bool {
-	return (len(q.Field) == 0 || len(q.Keyword) == 0) && len(q.Must) == 0 && len(q.Should) == 0
+	return q.Keyword == nil && len(q.Must) == 0 && len(q.Should) == 0
 }
 
 // Builder模式。方法返回结构体本身
@@ -32,7 +33,7 @@ func (q TermQuery) And(querys ...TermQuery) TermQuery {
 			array = append(array, ele)
 		}
 	}
-	return TermQuery{Must: array}
+	return TermQuery{Must: array} //TermQuery的一级成员里只有Must非空，Keyword和Should都为空
 }
 
 func (q TermQuery) Or(querys ...TermQuery) TermQuery {
@@ -49,13 +50,13 @@ func (q TermQuery) Or(querys ...TermQuery) TermQuery {
 			array = append(array, ele)
 		}
 	}
-	return TermQuery{Should: array}
+	return TermQuery{Should: array} //TermQuery的一级成员里只有Should非空，Must和Keyword都为空
 }
 
-//print函数会自动调用变量的String()方法
+// print函数会自动调用变量的String()方法
 func (q TermQuery) String() string {
-	if len(q.Keyword) > 0 {
-		return q.Field + "_" + q.Keyword
+	if q.Keyword != nil {
+		return q.Keyword.ToString()
 	} else if len(q.Must) > 0 {
 		if len(q.Must) == 1 {
 			return q.Must[0].String()
