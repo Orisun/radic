@@ -2,8 +2,9 @@ package radic
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/gob"
+	"strings"
+	"sync/atomic"
 
 	"github.com/Orisun/radic/v2/internal/kvdb"
 	reverseindex "github.com/Orisun/radic/v2/internal/reverse_index"
@@ -15,6 +16,7 @@ import (
 type Indexer struct {
 	forwardIndex kvdb.IKeyValueDB
 	reverseIndex reverseindex.IReverseIndexer
+	maxIntId     uint64
 }
 
 // 初始化索引
@@ -33,74 +35,98 @@ func (indexer *Indexer) Close() error {
 	return indexer.forwardIndex.Close()
 }
 
-// 把int转为vint
-//
-// 返回的[]byte中不存在0
-func Int2Varint(docId uint32) []byte {
-	key := make([]byte, 8)
-	cnt := binary.PutUvarint(key, uint64(docId))
-	return key[:cnt]
-}
-
-// 向索引中添加文档
-func (indexer *Indexer) AddDoc(doc types.DocInfo) {
-	//doc.Entry写入正排索引
-	indexer.forwardIndex.Set(Int2Varint(doc.DocId), doc.Entry)
-	//doc.Keyword写入正排索引
-	var value bytes.Buffer
-	encoder := gob.NewEncoder(&value)
-	if err := encoder.Encode(doc.Keyword); err == nil {
-		indexer.forwardIndex.Set(append(Int2Varint(doc.DocId), 0), value.Bytes()) //key统一以0结尾，以此来区分value里存在的是doc.Entry还是doc.Keyword
-	}
-
-	//遍历每一个keyword，写入倒排索引
-	Keywords := make([]string, 0, len(doc.Keyword))
-	for _, keyword := range doc.Keyword {
-		Keywords = append(Keywords, keyword.ToString())
-	}
-	indexer.reverseIndex.Add(doc.DocId, doc.CompositeFeature, Keywords)
-}
-
 // 从索引上删除文档
-func (indexer *Indexer) DeleteDoc(docId uint32) {
-	//先读正排索引，得到doc.Keyword
-	keyBytes, err := indexer.forwardIndex.Get(append(Int2Varint(docId), 0))
+func (indexer *Indexer) DeleteDoc(docId string) {
+	forwardKey := []byte(docId)
+	//先读正排索引，得到IntId和Keywords
+	docBs, err := indexer.forwardIndex.Get(forwardKey)
 	if err == nil {
-		keysReader := bytes.NewReader([]byte{})
-		if len(keyBytes) > 0 {
-			keysReader.Reset(keyBytes)
-			keysDecoder := gob.NewDecoder(keysReader)
-			var keywords []*types.Keyword
-			err3 := keysDecoder.Decode(&keywords)
-			if err3 == nil {
+		reader := bytes.NewReader([]byte{})
+		if len(docBs) > 0 {
+			reader.Reset(docBs)
+			decoder := gob.NewDecoder(reader)
+			var doc types.Document
+			err := decoder.Decode(&doc)
+			if err == nil {
 				// 遍历每一个keyword，从倒排索引上删除
-				for _, kw := range keywords {
-					indexer.reverseIndex.Delete(docId, kw.ToString())
+				for _, kw := range doc.Keywords {
+					indexer.reverseIndex.Delete(doc.IntId, kw)
 				}
 			}
 		}
 	}
 	//从正排上删除
-	indexer.forwardIndex.Delete(Int2Varint(docId))
-	indexer.forwardIndex.Delete(append(Int2Varint(docId), 0))
+	indexer.forwardIndex.Delete(forwardKey)
+}
+
+// 向索引中添加文档(如果已存在，会先删除)
+func (indexer *Indexer) AddDoc(doc types.Document) {
+	docId := strings.TrimSpace(doc.Id)
+	if len(docId) == 0 {
+		return
+	}
+	//先从正排和倒排索引上将docId删除
+	indexer.DeleteDoc(docId)
+
+	doc.IntId = atomic.AddUint64(&indexer.maxIntId, 1) //写入索引时自动为文档生成IntId
+	//写入正排索引
+	var value bytes.Buffer
+	encoder := gob.NewEncoder(&value)
+	if err := encoder.Encode(doc); err == nil {
+		indexer.forwardIndex.Set([]byte(docId), value.Bytes())
+	}
+
+	//写入倒排索引
+	indexer.reverseIndex.Add(doc)
+}
+
+// 系统重启时，直接从索引文件里加载数据
+func (indexer *Indexer) LoadFromIndexFile() int {
+	reader := bytes.NewReader([]byte{})
+	n := indexer.forwardIndex.IterDB(func(k, v []byte) error {
+		reader.Reset(v)
+		decoder := gob.NewDecoder(reader)
+		var doc types.Document
+		err := decoder.Decode(&doc)
+		if err != nil {
+			util.Log.Printf("gob decode document failed：%s", err)
+			return nil
+		}
+		indexer.reverseIndex.Add(doc)
+		return err
+	})
+	return int(n)
 }
 
 // 检索，返回文档列表
-func (indexer *Indexer) Search(query types.TermQuery, onFlag uint32, offFlag uint32, orFlags []uint32) [][]byte {
+func (indexer *Indexer) Search(query types.TermQuery, onFlag uint64, offFlag uint64, orFlags []uint64) [][]byte {
 	docIds := indexer.reverseIndex.Search(query, onFlag, offFlag, orFlags)
 	if len(docIds) == 0 {
 		return nil
 	}
 	keys := make([][]byte, 0, len(docIds))
 	for _, docId := range docIds {
-		keys = append(keys, Int2Varint(docId))
+		keys = append(keys, []byte(docId))
 	}
 	data, err := indexer.forwardIndex.BatchGet(keys)
 	if err != nil {
 		util.Log.Printf("read kvdb failed: %s", err)
 		return nil
 	}
-	return data
+	result := make([][]byte, 0, len(data))
+	reader := bytes.NewReader([]byte{})
+	for _, docBs := range data {
+		if len(docBs) > 0 {
+			reader.Reset(docBs)
+			decoder := gob.NewDecoder(reader)
+			var doc types.Document
+			err := decoder.Decode(&doc)
+			if err == nil {
+				result = append(result, doc.Bytes)
+			}
+		}
+	}
+	return result
 }
 
 // 遍历倒排索引

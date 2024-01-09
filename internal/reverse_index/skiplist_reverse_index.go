@@ -29,17 +29,24 @@ func (indexer SkipListReverseIndex) getLock(key string) *sync.RWMutex {
 	return &indexer.locks[n%len(indexer.locks)]
 }
 
+type SkipListValue struct {
+	Id          string
+	BitsFeature uint64
+}
+
 // 添加一个doc
-func (indexer *SkipListReverseIndex) Add(DocId uint32, FeatureBits uint32, Keywords []string) {
-	for _, key := range Keywords {
+func (indexer *SkipListReverseIndex) Add(doc types.Document) {
+	for _, keyword := range doc.Keywords {
+		key := keyword.ToString()
 		lock := indexer.getLock(key)
 		lock.Lock()
+		sklValue := SkipListValue{doc.Id, doc.BitsFeature}
 		if value, exists := indexer.table.Get(key); exists {
 			list := value.(*skiplist.SkipList)
-			list.Set(DocId, FeatureBits) //DocId作为SkipList的key，FeatureBits作为SkipList的Value
+			list.Set(doc.IntId, sklValue) //IntId作为SkipList的key，而value里则包含了业务侧的文档id和BitsFeature
 		} else {
-			list := skiplist.New(skiplist.Uint32)
-			list.Set(DocId, FeatureBits)
+			list := skiplist.New(skiplist.Uint64)
+			list.Set(doc.IntId, sklValue)
 			indexer.table.Set(key, list)
 		}
 		// util.Log.Printf("add key %s value %d to reverse index\n", key, DocId)
@@ -53,12 +60,13 @@ func (indexer *SkipListReverseIndex) Iter(f func(key string, value any)) {
 }
 
 // 从key上删除对应的doc
-func (indexer *SkipListReverseIndex) Delete(DocId uint32, Keyword string) {
-	lock := indexer.getLock(Keyword)
+func (indexer *SkipListReverseIndex) Delete(IntId uint64, keyword *types.Keyword) {
+	key := keyword.ToString()
+	lock := indexer.getLock(key)
 	lock.Lock()
-	if value, exists := indexer.table.Get(Keyword); exists {
-		list := value.(skiplist.SkipList)
-		list.Remove(DocId)
+	if value, exists := indexer.table.Get(key); exists {
+		list := value.(*skiplist.SkipList)
+		list.Remove(IntId)
 	}
 	lock.Unlock()
 }
@@ -71,7 +79,7 @@ func IntersectionOfSkipList(lists ...*skiplist.SkipList) *skiplist.SkipList {
 	if len(lists) == 1 {
 		return lists[0]
 	}
-	result := skiplist.New(skiplist.Uint32)
+	result := skiplist.New(skiplist.Uint64)
 	currNodes := make([]*skiplist.Element, len(lists)) //给每条SkipList分配一个指针，从前往后遍历
 	for i, list := range lists {
 		if list == nil || list.Len() == 0 { //只要lists中有一条是空链，则交集为空
@@ -81,12 +89,12 @@ func IntersectionOfSkipList(lists ...*skiplist.SkipList) *skiplist.SkipList {
 	}
 	for {
 		maxList := make(map[int]struct{}, len(currNodes)) //此刻，哪个指针对应的值最大（最大者可能存在多个，所以用map）
-		var maxValue uint32 = 0
+		var maxValue uint64 = 0
 		for i, node := range currNodes {
-			if node.Key().(uint32) > maxValue {
-				maxValue = node.Key().(uint32)
+			if node.Key().(uint64) > maxValue {
+				maxValue = node.Key().(uint64)
 				maxList = map[int]struct{}{i: {}} //可以用一对大括号表示空结构体实例
-			} else if node.Key().(uint32) == maxValue {
+			} else if node.Key().(uint64) == maxValue {
 				maxList[i] = struct{}{}
 			}
 		}
@@ -119,7 +127,7 @@ func UnionsetOfSkipList(lists ...*skiplist.SkipList) *skiplist.SkipList {
 	if len(lists) == 1 {
 		return lists[0]
 	}
-	result := skiplist.New(skiplist.Uint32)
+	result := skiplist.New(skiplist.Uint64)
 	keySet := make(map[any]struct{}, 1000)
 	for _, list := range lists {
 		if list == nil {
@@ -138,7 +146,7 @@ func UnionsetOfSkipList(lists ...*skiplist.SkipList) *skiplist.SkipList {
 }
 
 // 按照bits特征进行过滤
-func (indexer SkipListReverseIndex) FilterByBits(flag uint32, onFlag uint32, offFlag uint32, orFlags []uint32) bool {
+func (indexer SkipListReverseIndex) FilterByBits(flag uint64, onFlag uint64, offFlag uint64, orFlags []uint64) bool {
 	//onFlag所有bit必须全部命中
 	if flag&onFlag != onFlag {
 		return false
@@ -157,19 +165,20 @@ func (indexer SkipListReverseIndex) FilterByBits(flag uint32, onFlag uint32, off
 }
 
 // 搜索，返回SkipList
-func (indexer SkipListReverseIndex) search(q types.TermQuery, onFlag uint32, offFlag uint32, orFlags []uint32) *skiplist.SkipList {
+func (indexer SkipListReverseIndex) search(q types.TermQuery, onFlag uint64, offFlag uint64, orFlags []uint64) *skiplist.SkipList {
 	if q.Keyword != nil {
 		Keyword := q.Keyword.ToString()
 		if value, exists := indexer.table.Get(Keyword); exists {
-			result := skiplist.New(skiplist.Uint32) //TODO 可能需要用sync.Pool
+			result := skiplist.New(skiplist.Uint64)
 			list := value.(*skiplist.SkipList)
 			// util.Log.Printf("retrive %d docs by key %s", list.Len(), Keyword)
 			node := list.Front()
 			for node != nil {
-				docId := node.Key().(uint32)
-				flag := node.Value.(uint32)
-				if docId > 0 && indexer.FilterByBits(flag, onFlag, offFlag, orFlags) { //确保有效元素都大于0
-					result.Set(docId, flag)
+				intId := node.Key().(uint64)
+				skv, _ := node.Value.(SkipListValue)
+				flag := skv.BitsFeature
+				if intId > 0 && indexer.FilterByBits(flag, onFlag, offFlag, orFlags) { //确保有效元素都大于0
+					result.Set(intId, skv)
 				}
 				node = node.Next()
 			}
@@ -192,12 +201,13 @@ func (indexer SkipListReverseIndex) search(q types.TermQuery, onFlag uint32, off
 }
 
 // 搜索，返回docId
-func (indexer SkipListReverseIndex) Search(query types.TermQuery, onFlag uint32, offFlag uint32, orFlags []uint32) []uint32 {
+func (indexer SkipListReverseIndex) Search(query types.TermQuery, onFlag uint64, offFlag uint64, orFlags []uint64) []string {
 	result := indexer.search(query, onFlag, offFlag, orFlags)
-	arr := make([]uint32, 0, result.Len())
+	arr := make([]string, 0, result.Len())
 	node := result.Front()
 	for node != nil {
-		arr = append(arr, node.Key().(uint32))
+		skv, _ := node.Value.(SkipListValue)
+		arr = append(arr, skv.Id)
 		node = node.Next()
 	}
 	return arr

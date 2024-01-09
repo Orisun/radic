@@ -4,27 +4,15 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/Orisun/radic/v2/internal/kvdb"
+	reverseindex "github.com/Orisun/radic/v2/internal/reverse_index"
 	"github.com/Orisun/radic/v2/types"
 	"github.com/Orisun/radic/v2/util"
+	"github.com/huandu/skiplist"
 )
-
-func TestInt2Varint(t *testing.T) {
-	fmt.Println(Int2Varint(100))
-	fmt.Println(Int2Varint(1000))
-	fmt.Println(Int2Varint(10000))
-	var i uint32
-	for i = 1; i < 100000000; i++ {
-		for _, ele := range Int2Varint(i) {
-			if ele == 0 {
-				fmt.Println(i)
-				t.Fail()
-			}
-		}
-	}
-}
 
 type Book struct {
 	ISBN    string
@@ -42,7 +30,7 @@ func (book *Book) Serialize() []byte {
 	if err == nil {
 		return value.Bytes()
 	} else {
-		fmt.Println(err)
+		fmt.Println("序列化图书失败", err)
 		return []byte{}
 	}
 }
@@ -56,14 +44,21 @@ func DeserializeBook(v []byte) *Book {
 	if err == nil {
 		return &data
 	} else {
-		fmt.Println(err)
+		fmt.Println("反序列化图书失败", err)
 		return nil
 	}
 }
 
+var (
+	// dbType=kvdb.BOLT
+	// dbPath=util.RootPath+"data/local_db/book_bolt"
+	dbType = kvdb.BADGER
+	dbPath = util.RootPath + "data/local_db/book_badger"
+)
+
 func TestSearch(t *testing.T) {
 	indexer := new(Indexer)
-	if err := indexer.Init(100, kvdb.BOLT, util.RootPath+"data/local_db/book_bolt"); err != nil {
+	if err := indexer.Init(100, dbType, dbPath); err != nil {
 		fmt.Println(err)
 		t.Fail()
 		return
@@ -92,23 +87,23 @@ func TestSearch(t *testing.T) {
 		Content: "冰雪奇缘2 中文版电影原声带 (Frozen 2 (Mandarin Original Motion Picture",
 	}
 
-	doc1 := types.DocInfo{
-		DocId:            1,
-		CompositeFeature: 0b10101, //二进制
-		Keyword:          []*types.Keyword{{Field: "content", Word: "机器学习"}, {Field: "content", Word: "神经网络"}, {Field: "title", Word: "计算机"}},
-		Entry:            book1.Serialize(), //写入索引时需要自行序列化
+	doc1 := types.Document{
+		Id:          "36435",
+		BitsFeature: 0b10101, //二进制
+		Keywords:    []*types.Keyword{{Field: "content", Word: "机器学习"}, {Field: "content", Word: "神经网络"}, {Field: "title", Word: "计算机"}},
+		Bytes:       book1.Serialize(), //写入索引时需要自行序列化
 	}
-	doc2 := types.DocInfo{
-		DocId:            2,
-		CompositeFeature: 0b10011, //二进制
-		Keyword:          []*types.Keyword{{Field: "content", Word: "唐朝"}, {Field: "content", Word: "文物"}, {Field: "title", Word: "历史"}},
-		Entry:            book2.Serialize(),
+	doc2 := types.Document{
+		Id:          "673642",
+		BitsFeature: 0b10011, //二进制
+		Keywords:    []*types.Keyword{{Field: "content", Word: "唐朝"}, {Field: "content", Word: "文物"}, {Field: "title", Word: "历史"}},
+		Bytes:       book2.Serialize(),
 	}
-	doc3 := types.DocInfo{
-		DocId:            3,
-		CompositeFeature: 0b11101, //二进制
-		Keyword:          []*types.Keyword{{Field: "content", Word: "动物"}, {Field: "content", Word: "细胞"}, {Field: "title", Word: "生命"}},
-		Entry:            book3.Serialize(),
+	doc3 := types.Document{
+		Id:          "314325",
+		BitsFeature: 0b11101, //二进制
+		Keywords:    []*types.Keyword{{Field: "content", Word: "动物"}, {Field: "content", Word: "文物"}, {Field: "title", Word: "生命"}},
+		Bytes:       book3.Serialize(),
 	}
 
 	indexer.AddDoc(doc1)
@@ -116,7 +111,7 @@ func TestSearch(t *testing.T) {
 	indexer.AddDoc(doc3)
 
 	q1 := types.NewTermQuery("title", "生命")
-	q2 := types.NewTermQuery("content", "细胞")
+	q2 := types.NewTermQuery("content", "文物")
 	q3 := types.NewTermQuery("title", "历史")
 	q4 := types.NewTermQuery("content", "文物")
 	q5 := types.NewTermQuery("content", "唐朝")
@@ -126,9 +121,9 @@ func TestSearch(t *testing.T) {
 
 	q8 := q6.Or(q7)
 
-	var onFlag uint32 = 0b10000
-	var offFlag uint32 = 0b01000
-	orFlags := []uint32{uint32(0b00010), uint32(0b00101)}
+	var onFlag uint64 = 0b10000
+	var offFlag uint64 = 0b01000
+	orFlags := []uint64{uint64(0b00010), uint64(0b00101)}
 	docs := indexer.Search(q8, onFlag, offFlag, orFlags) //检索
 	for _, doc := range docs {
 		book := DeserializeBook(doc) //检索的结果是二进流，需要自反序列化
@@ -136,7 +131,115 @@ func TestSearch(t *testing.T) {
 			fmt.Printf("%s %s %s %.1f\n", book.ISBN, book.Title, book.Author, book.Price)
 		}
 	}
+	fmt.Println(strings.Repeat("-", 50))
+
+	indexer.DeleteDoc(doc2.Id)
+	docs = indexer.Search(q8, onFlag, offFlag, orFlags) //检索
+	for _, doc := range docs {
+		book := DeserializeBook(doc) //检索的结果是二进流，需要自反序列化
+		if book != nil {
+			fmt.Printf("%s %s %s %.1f\n", book.ISBN, book.Title, book.Author, book.Price)
+		}
+	}
+	fmt.Println(strings.Repeat("-", 50))
+
+	indexer.AddDoc(doc2)
+	docs = indexer.Search(q8, onFlag, offFlag, orFlags) //检索
+	for _, doc := range docs {
+		book := DeserializeBook(doc) //检索的结果是二进流，需要自反序列化
+		if book != nil {
+			fmt.Printf("%s %s %s %.1f\n", book.ISBN, book.Title, book.Author, book.Price)
+		}
+	}
+	fmt.Println(strings.Repeat("-", 50))
+
 }
 
-// go test -v . -run=^TestInt2Varint$ -count=1
+func TestLoadFromIndexFile(t *testing.T) {
+	indexer := new(Indexer)
+	if err := indexer.Init(100, dbType, dbPath); err != nil {
+		fmt.Println(err)
+		t.Fail()
+		return
+	}
+	defer indexer.Close()
+
+	n := indexer.LoadFromIndexFile()
+	if n == 0 {
+		return
+	} else {
+		util.Log.Printf("load %d document from invere document", n)
+	}
+	indexer.IterReverseIndex(func(key string, value any) {
+		skv := value.(*skiplist.SkipList)
+		fmt.Printf("%s ", key)
+		node := skv.Front()
+		for node != nil {
+			fmt.Printf("%d_", node.Key().(uint64)) //IntId_
+			v := node.Value.(reverseindex.SkipListValue)
+			fmt.Printf("%s_%b ", v.Id, v.BitsFeature) //DocId_BitsFeature
+			node = node.Next()
+		}
+		fmt.Println()
+	})
+
+	q1 := types.NewTermQuery("title", "生命")
+	q2 := types.NewTermQuery("content", "文物")
+	q3 := types.NewTermQuery("title", "历史")
+	q4 := types.NewTermQuery("content", "文物")
+	q5 := types.NewTermQuery("content", "唐朝")
+
+	q6 := q1.And(q2)
+	q7 := q3.And(q4).And(q5)
+
+	q8 := q6.Or(q7)
+
+	var onFlag uint64 = 0b10000
+	var offFlag uint64 = 0b01000
+	orFlags := []uint64{uint64(0b00010), uint64(0b00101)}
+	docs := indexer.Search(q8, onFlag, offFlag, orFlags) //检索
+	for _, doc := range docs {
+		book := DeserializeBook(doc) //检索的结果是二进流，需要自反序列化
+		if book != nil {
+			fmt.Printf("%s %s %s %.1f\n", book.ISBN, book.Title, book.Author, book.Price)
+		}
+	}
+	fmt.Println(strings.Repeat("-", 50))
+
+	book2 := Book{
+		ISBN:    "436246383",
+		Title:   "中国历史",
+		Author:  "李四",
+		Price:   39.0,
+		Content: "冰雪奇缘2 中文版电影原声带 (Frozen 2 (Mandarin Original Motion Picture",
+	}
+	doc2 := types.Document{
+		Id:          "673642",
+		BitsFeature: 0b10011, //二进制
+		Keywords:    []*types.Keyword{{Field: "content", Word: "唐朝"}, {Field: "content", Word: "文物"}, {Field: "title", Word: "历史"}},
+		Bytes:       book2.Serialize(),
+	}
+
+	indexer.DeleteDoc(doc2.Id)
+	docs = indexer.Search(q8, onFlag, offFlag, orFlags) //检索
+	for _, doc := range docs {
+		book := DeserializeBook(doc) //检索的结果是二进流，需要自反序列化
+		if book != nil {
+			fmt.Printf("%s %s %s %.1f\n", book.ISBN, book.Title, book.Author, book.Price)
+		}
+	}
+	fmt.Println(strings.Repeat("-", 50))
+
+	indexer.AddDoc(doc2)
+	docs = indexer.Search(q8, onFlag, offFlag, orFlags) //检索
+	for _, doc := range docs {
+		book := DeserializeBook(doc) //检索的结果是二进流，需要自反序列化
+		if book != nil {
+			fmt.Printf("%s %s %s %.1f\n", book.ISBN, book.Title, book.Author, book.Price)
+		}
+	}
+	fmt.Println(strings.Repeat("-", 50))
+}
+
 // go test -v . -run=^TestSearch$ -count=1
+// go test -v . -run=^TestLoadFromIndexFile$ -count=1
