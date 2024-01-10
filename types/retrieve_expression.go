@@ -1,5 +1,5 @@
-// Deprecated 这是反面教材，多层函数嵌套。正面教材参见 package query
-package model
+// Deprecated 这是反面教材，多层函数嵌套。正面教材参见 term_query
+package types
 
 import "strings"
 

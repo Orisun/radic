@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package demo;
+
+message BiliVideo {
+    string Id = 1;
+    string Title = 2;
+    int64 PostTime = 3;
+    string Author = 4;
+    int32 View = 5;
+    int32 Like = 6;
+    int32 Coin = 7;
+    int32 Favorite = 8;
+    int32 Share = 9;
+    repeated string Keywords = 10;
+}
+
+// protoc --gogofaster_out=./demo --proto_path=./demo video.proto
