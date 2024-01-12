@@ -20,6 +20,7 @@ func listenSignal() {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	<-sigCh
 	demo.CloseIndex() //接收到kill信号时关闭索引
+	os.Exit(0)
 }
 
 func main() {
@@ -33,8 +34,15 @@ func main() {
 
 	engine := gin.Default()
 	gin.SetMode(gin.ReleaseMode)
+
+	engine.Static("js", "demo/views/js")
+	engine.Static("css", "demo/views/css")
+	engine.Static("img", "demo/views/img")
+	engine.StaticFile("/favicon.ico", "img/dqq.png") //在url中访问文件/favicon.ico，相当于访问文件系统中的views/img/dqq.png文件
+	engine.LoadHTMLFiles("demo/views/search.html")   //使用这些.html文件时就不需要加路径了
+
 	engine.GET("/", func(ctx *gin.Context) {
-		ctx.HTML(http.StatusOK, "search.html", nil)
+		ctx.HTML(http.StatusOK, "search.html", []string{"资讯", "社会", "热点", "生活", "知识", "环球", "游戏", "综合", "日常", "影视", "科技", "编程"})
 	})
 	engine.POST("/search", demo.Search)
 	engine.Run(":5678")

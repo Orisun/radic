@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/Orisun/radic/v2"
 	"github.com/Orisun/radic/v2/internal/kvdb"
@@ -15,6 +16,7 @@ import (
 )
 
 type SearchRequest struct {
+	Author   string
 	Classes  []string //类别，命中一个即可
 	Keywords []string //关键词，必须全部命中
 	ViewFrom int      //视频播放量下限
@@ -60,26 +62,29 @@ func Search(ctx *gin.Context) {
 		return
 	}
 
-	if len(request.Keywords) > 0 {
-		query := types.NewTermQuery("content", request.Keywords[0])
-		for _, word := range request.Keywords[1:] {
-			query = query.And(types.NewTermQuery("content", word)) //满足关键词
-		}
-		orFlags := []uint64{GetClassBits(request.Classes)} //满足类别
-		docs := indexer.Search(query, 0, 0, orFlags)
-		videos := make([]BiliVideo, 0, len(docs))
-		for _, doc := range docs {
-			var video BiliVideo
-			if err := proto.Unmarshal(doc, &video); err == nil {
-				if video.View >= int32(request.ViewFrom) && (request.ViewTo <= 0 || video.View <= int32(request.ViewTo)) { //满足播放量的区间范围
-					videos = append(videos, video)
-				}
-			}
-		}
-		ctx.JSON(http.StatusOK, videos) //把搜索结果以json形式返回给前端
-		return
-	} else {
-		ctx.String(http.StatusBadRequest, "please specify at least one keyword")
+	if len(request.Keywords) == 0 && len(request.Author) == 0 {
+		ctx.String(http.StatusBadRequest, "关键词和作者不能同时为空")
 		return
 	}
+	query := types.TermQuery{}
+	if len(request.Keywords) > 0 {
+		for _, word := range request.Keywords {
+			query = query.And(types.NewTermQuery("content", strings.ToLower(word))) //满足关键词
+		}
+	}
+	if len(request.Author) > 0 {
+		query = query.And(types.NewTermQuery("author", strings.ToLower(request.Author))) //满足作者
+	}
+	orFlags := []uint64{GetClassBits(request.Classes)} //满足类别
+	docs := indexer.Search(query, 0, 0, orFlags)
+	videos := make([]BiliVideo, 0, len(docs))
+	for _, doc := range docs {
+		var video BiliVideo
+		if err := proto.Unmarshal(doc, &video); err == nil {
+			if video.View >= int32(request.ViewFrom) && (request.ViewTo <= 0 || video.View <= int32(request.ViewTo)) { //满足播放量的区间范围
+				videos = append(videos, video)
+			}
+		}
+	}
+	ctx.JSON(http.StatusOK, videos) //把搜索结果以json形式返回给前端
 }

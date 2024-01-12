@@ -91,7 +91,10 @@ func AddVideo2Index(video *BiliVideo, indexer *radic.Indexer) {
 	}
 	keywords := make([]*types.Keyword, 0, len(video.Keywords))
 	for _, word := range video.Keywords {
-		keywords = append(keywords, &types.Keyword{Field: "content", Word: word})
+		keywords = append(keywords, &types.Keyword{Field: "content", Word: strings.ToLower(word)})
+	}
+	if len(video.Author) > 0 {
+		keywords = append(keywords, &types.Keyword{Field: "author", Word: strings.ToLower(strings.TrimSpace(video.Author))})
 	}
 	doc.Keywords = keywords
 	doc.BitsFeature = GetClassBits(video.Keywords)
