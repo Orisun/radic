@@ -129,7 +129,8 @@ func (indexer *Indexer) Init(options types.IndexerOpts) {
 				indexer.dbs[i] = stg
 			}
 		} else {
-			panic("open storage failed")
+			panic(fmt.Errorf("open storage %s failed: %s", path.Join(options.DbPath,
+				options.IndexName+"."+strconv.Itoa(i)), err))
 		}
 	}
 	indexer.initialized = true
