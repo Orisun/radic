@@ -1,6 +1,7 @@
 package demo
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -62,14 +63,23 @@ func Search(ctx *gin.Context) {
 		return
 	}
 
-	if len(request.Keywords) == 0 && len(request.Author) == 0 {
+	keywords := make([]string, 0, len(request.Keywords))
+	for _, w := range request.Keywords {
+		word := strings.TrimSpace(strings.ToLower(w))
+		if len(word) > 0 {
+			keywords = append(keywords, word)
+		}
+	}
+	fmt.Println(keywords)
+
+	if len(keywords) == 0 && len(request.Author) == 0 {
 		ctx.String(http.StatusBadRequest, "关键词和作者不能同时为空")
 		return
 	}
 	query := types.TermQuery{}
-	if len(request.Keywords) > 0 {
-		for _, word := range request.Keywords {
-			query = query.And(types.NewTermQuery("content", strings.ToLower(word))) //满足关键词
+	if len(keywords) > 0 {
+		for _, word := range keywords {
+			query = query.And(types.NewTermQuery("content", word)) //满足关键词
 		}
 	}
 	if len(request.Author) > 0 {

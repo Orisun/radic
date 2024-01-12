@@ -45,7 +45,7 @@ func main() {
 		ctx.HTML(http.StatusOK, "search.html", []string{"资讯", "社会", "热点", "生活", "知识", "环球", "游戏", "综合", "日常", "影视", "科技", "编程"})
 	})
 	engine.POST("/search", demo.Search)
-	engine.Run(":5678")
+	engine.Run("127.0.0.1:5678")
 }
 
 // go run ./demo/main -index=false
