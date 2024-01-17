@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package types;
+
+message Keyword {
+    string Field = 1;
+    string Word = 2;
+}
+
+message Document {
+    string Id = 1;          //业务使用的唯一Id，索引上此Id不会重复
+    uint64 IntId = 2;       //倒排索引上使用的文档id(业务侧不用管这个字段)
+    uint64 BitsFeature = 3; //每个bit都表示某种特征的取值
+    repeated Keyword Keywords = 4;      //倒排索引的key
+    bytes Bytes = 5;        //业务实体序列化之后的结果
+}
+
+// protoc --gogofaster_out=./types --proto_path=./types doc.proto

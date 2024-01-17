@@ -1,6 +1,4 @@
-.DS_Store/
-.idea/
-db/
-dbs/
-sta.txt
-data/
+.DS_Store
+.idea
+.vscode
+data

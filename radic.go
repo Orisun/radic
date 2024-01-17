@@ -95,11 +95,12 @@ func (indexer *Indexer) LoadFromIndexFile() int {
 		indexer.reverseIndex.Add(doc)
 		return err
 	})
+	util.Log.Printf("load %d data from forward index", n)
 	return int(n)
 }
 
 // 检索，返回文档列表
-func (indexer *Indexer) Search(query types.TermQuery, onFlag uint64, offFlag uint64, orFlags []uint64) [][]byte {
+func (indexer *Indexer) Search(query *types.TermQuery, onFlag uint64, offFlag uint64, orFlags []uint64) [][]byte {
 	docIds := indexer.reverseIndex.Search(query, onFlag, offFlag, orFlags)
 	if len(docIds) == 0 {
 		return nil

@@ -165,7 +165,7 @@ func (indexer SkipListReverseIndex) FilterByBits(flag uint64, onFlag uint64, off
 }
 
 // 搜索，返回SkipList
-func (indexer SkipListReverseIndex) search(q types.TermQuery, onFlag uint64, offFlag uint64, orFlags []uint64) *skiplist.SkipList {
+func (indexer SkipListReverseIndex) search(q *types.TermQuery, onFlag uint64, offFlag uint64, orFlags []uint64) *skiplist.SkipList {
 	if q.Keyword != nil {
 		Keyword := q.Keyword.ToString()
 		if value, exists := indexer.table.Get(Keyword); exists {
@@ -201,8 +201,11 @@ func (indexer SkipListReverseIndex) search(q types.TermQuery, onFlag uint64, off
 }
 
 // 搜索，返回docId
-func (indexer SkipListReverseIndex) Search(query types.TermQuery, onFlag uint64, offFlag uint64, orFlags []uint64) []string {
+func (indexer SkipListReverseIndex) Search(query *types.TermQuery, onFlag uint64, offFlag uint64, orFlags []uint64) []string {
 	result := indexer.search(query, onFlag, offFlag, orFlags)
+	if result == nil {
+		return nil
+	}
 	arr := make([]string, 0, result.Len())
 	node := result.Front()
 	for node != nil {

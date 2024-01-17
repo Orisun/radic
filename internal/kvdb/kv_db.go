@@ -26,8 +26,8 @@ type IKeyValueDB interface {
 	Delete(k []byte) error                    //删除
 	BatchDelete(keys [][]byte) error          //批量删除
 	Has(k []byte) bool                        //判断某个key是否存在
-	IterDB(fn func(k, v []byte) error) int64  //遍历数据库
-	IterKey(fn func(k []byte) error) int64    //遍历所有key
+	IterDB(fn func(k, v []byte) error) int64  //遍历数据库，返回数据的条数
+	IterKey(fn func(k []byte) error) int64    //遍历所有key，返回数据的条数
 	Close() error                             //把内存中的数据flush到磁盘，同时释放文件锁
 }
 
