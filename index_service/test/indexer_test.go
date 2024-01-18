@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Orisun/radic/v2/internal/index_service"
+	"github.com/Orisun/radic/v2/index_service"
 	"github.com/Orisun/radic/v2/internal/kvdb"
 	reverseindex "github.com/Orisun/radic/v2/internal/reverse_index"
 	"github.com/Orisun/radic/v2/types"
@@ -242,5 +242,5 @@ func TestLoadFromIndexFile(t *testing.T) {
 	fmt.Println(strings.Repeat("-", 50))
 }
 
-// go test -v ./internal/index_service/test -run=^TestSearch$ -count=1
-// go test -v ./internal/index_service/test -run=^TestLoadFromIndexFile$ -count=1
+// go test -v ./index_service/test -run=^TestSearch$ -count=1
+// go test -v ./index_service/test -run=^TestLoadFromIndexFile$ -count=1

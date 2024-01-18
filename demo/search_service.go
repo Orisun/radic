@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Orisun/radic/v2"
+	"github.com/Orisun/radic/v2/index_service"
 	"github.com/Orisun/radic/v2/internal/kvdb"
 	"github.com/Orisun/radic/v2/types"
 	"github.com/Orisun/radic/v2/util"
@@ -26,14 +26,14 @@ type SearchRequest struct {
 var (
 	dbType  = kvdb.BOLT
 	dbPath  = util.RootPath + "data/local_db/vedio_bolt"
-	indexer *radic.Indexer
+	indexer *index_service.Indexer
 	csvFile = util.RootPath + "data/bili_video.csv"
 )
 
 // 从CSV文件重建索引
 func BuildIndex() {
 	os.Remove(dbPath) //先删除原有的索引文件
-	indexer = new(radic.Indexer)
+	indexer = new(index_service.Indexer)
 	if err := indexer.Init(50000, dbType, dbPath); err != nil {
 		panic(err)
 	}
@@ -42,7 +42,7 @@ func BuildIndex() {
 
 // 直接加载索引文件
 func LoadIndex() {
-	indexer = new(radic.Indexer)
+	indexer = new(index_service.Indexer)
 	if err := indexer.Init(50000, dbType, dbPath); err != nil {
 		panic(err)
 	}
@@ -88,7 +88,7 @@ func Search(ctx *gin.Context) {
 	videos := make([]BiliVideo, 0, len(docs))
 	for _, doc := range docs {
 		var video BiliVideo
-		if err := proto.Unmarshal(doc, &video); err == nil {
+		if err := proto.Unmarshal(doc.Bytes, &video); err == nil {
 			if video.View >= int32(request.ViewFrom) && (request.ViewTo <= 0 || video.View <= int32(request.ViewTo)) { //满足播放量的区间范围
 				videos = append(videos, video)
 			}

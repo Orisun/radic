@@ -20,11 +20,15 @@ func GetLocalIP() (ipv4 string, err error) {
 	// 取第一个非lo的网卡IP
 	for _, addr = range addrs {
 		// 这个网络地址是IP地址: ipv4, ipv6
-		if ipNet, isIpNet = addr.(*net.IPNet); isIpNet && !ipNet.IP.IsLoopback() {
-			// 跳过IPV6
-			if ipNet.IP.To4() != nil {
-				ipv4 = ipNet.IP.String()
-				return
+		if ipNet, isIpNet = addr.(*net.IPNet); isIpNet {
+			if !ipNet.IP.IsLoopback() {
+				if ipNet.IP.IsPrivate() { //内网地址
+					// 跳过IPV6
+					if ipNet.IP.To4() != nil {
+						ipv4 = ipNet.IP.String()
+						return
+					}
+				}
 			}
 		}
 	}

@@ -14,7 +14,7 @@ const (
 	INDEX_SERVICE = "index_service"
 )
 
-type IndexService struct {
+type IndexServiceWorker struct {
 	indexer *Indexer // 把正排和倒排索引放到一起
 	//跟服务注册相关的配置
 	hub      *ServiceHub
@@ -22,7 +22,7 @@ type IndexService struct {
 }
 
 // 初始化索引
-func (service *IndexService) Init(DocNumEstimate int, dbtype int, DataDir string, etcdServers []string, servicePort int) error {
+func (service *IndexServiceWorker) Init(DocNumEstimate int, dbtype int, DataDir string, etcdServers []string, servicePort int) error {
 	service.indexer = new(Indexer)
 	service.indexer.Init(DocNumEstimate, dbtype, DataDir)
 
@@ -35,6 +35,7 @@ func (service *IndexService) Init(DocNumEstimate int, dbtype int, DataDir string
 		if err != nil {
 			panic(err)
 		}
+		selfLocalIp = "127.0.0.1" //TODO 单机模拟分布式时，把selfLocalIp写死为127.0.0.1
 		service.selfAddr = selfLocalIp + ":" + strconv.Itoa(servicePort)
 		var heartBeat int64 = 3 //每隔3秒上报一次心跳
 		hub := GetServiceHub(etcdServers, heartBeat)
@@ -56,7 +57,7 @@ func (service *IndexService) Init(DocNumEstimate int, dbtype int, DataDir string
 }
 
 // 关闭索引
-func (service *IndexService) Close() error {
+func (service *IndexServiceWorker) Close() error {
 	if service.hub != nil {
 		service.hub.UnRegist(INDEX_SERVICE, service.selfAddr)
 	}
@@ -64,28 +65,28 @@ func (service *IndexService) Close() error {
 }
 
 // 从索引上删除文档
-func (service *IndexService) DeleteDoc(ctx context.Context, docId *DocId) (*AffectedCount, error) {
+func (service *IndexServiceWorker) DeleteDoc(ctx context.Context, docId *DocId) (*AffectedCount, error) {
 	return &AffectedCount{int32(service.indexer.DeleteDoc(docId.DocId))}, nil
 }
 
 // 向索引中添加文档(如果已存在，会先删除)
-func (service *IndexService) AddDoc(ctx context.Context, doc *types.Document) (*AffectedCount, error) {
+func (service *IndexServiceWorker) AddDoc(ctx context.Context, doc *types.Document) (*AffectedCount, error) {
 	n, err := service.indexer.AddDoc(*doc)
 	return &AffectedCount{int32(n)}, err
 }
 
 // 系统重启时，直接从索引文件里加载数据
-func (service *IndexService) LoadFromIndexFile() int {
+func (service *IndexServiceWorker) LoadFromIndexFile() int {
 	return service.indexer.LoadFromIndexFile()
 }
 
 // 检索，返回文档列表
-func (service *IndexService) Search(ctx context.Context, request *SearchRequest) (*SearchResult, error) {
+func (service *IndexServiceWorker) Search(ctx context.Context, request *SearchRequest) (*SearchResult, error) {
 	result := service.indexer.Search(request.Query, request.OnFlag, request.OffFlag, request.OrFlags)
 	return &SearchResult{Results: result}, nil
 }
 
 // 遍历倒排索引
-func (service *IndexService) IterReverseIndex(f func(key string, value any)) {
+func (service *IndexServiceWorker) IterReverseIndex(f func(key string, value any)) {
 	service.indexer.IterReverseIndex(f)
 }

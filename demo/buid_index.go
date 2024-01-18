@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Orisun/radic/v2"
+	"github.com/Orisun/radic/v2/index_service"
 	"github.com/Orisun/radic/v2/types"
 	proto "github.com/gogo/protobuf/proto"
 )
 
 // 把CSV文件中的视频信息全部写入索引
-func BuildIndexFromFile(csvFile string, indexer *radic.Indexer) {
+func BuildIndexFromFile(csvFile string, indexer *index_service.Indexer) {
 	file, err := os.Open(csvFile)
 	if err != nil {
 		log.Printf("open file %s failed: %s", csvFile, err)
@@ -80,7 +80,7 @@ func BuildIndexFromFile(csvFile string, indexer *radic.Indexer) {
 // 把一条视频信息写入索引（可能是create，也可能是update）
 //
 // 实时更新索引时可调该函数
-func AddVideo2Index(video *BiliVideo, indexer *radic.Indexer) {
+func AddVideo2Index(video *BiliVideo, indexer *index_service.Indexer) {
 	doc := types.Document{Id: video.Id}
 	bs, err := proto.Marshal(video)
 	if err == nil {
@@ -105,6 +105,6 @@ func AddVideo2Index(video *BiliVideo, indexer *radic.Indexer) {
 // 从索引上删除一条视频信息
 //
 // 实时更新索引时可调该函数
-func DeleteVideo(BVID string, indexer *radic.Indexer) {
+func DeleteVideo(BVID string, indexer *index_service.Indexer) {
 	indexer.DeleteDoc(BVID)
 }

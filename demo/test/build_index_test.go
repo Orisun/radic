@@ -4,8 +4,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Orisun/radic/v2"
 	"github.com/Orisun/radic/v2/demo"
+	"github.com/Orisun/radic/v2/index_service"
 	"github.com/Orisun/radic/v2/internal/kvdb"
 	"github.com/Orisun/radic/v2/util"
 )
@@ -13,12 +13,12 @@ import (
 var (
 	dbType  = kvdb.BOLT
 	dbPath  = util.RootPath + "data/local_db/vedio_bolt"
-	indexer *radic.Indexer
+	indexer *index_service.Indexer
 )
 
 func Init() {
 	os.Remove(dbPath) //先删除原有的索引文件
-	indexer = new(radic.Indexer)
+	indexer = new(index_service.Indexer)
 	if err := indexer.Init(50000, dbType, dbPath); err != nil {
 		panic(err)
 	}

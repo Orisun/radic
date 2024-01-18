@@ -30,7 +30,7 @@ service IndexService {
     rpc Search(SearchRequest) returns (SearchResult);
 }
 
-// protoc -I=D:/go_project/radic/types --gogofaster_opt=Mdoc.proto=github.com/Orisun/radic/v2/types --gogofaster_opt=Mterm_query.proto=github.com/Orisun/radic/v2/types --gogofaster_out=plugins=grpc:./internal/index_service --proto_path=./internal/index_service index.proto
+// protoc -I=D:/go_project/radic/types --gogofaster_opt=Mdoc.proto=github.com/Orisun/radic/v2/types --gogofaster_opt=Mterm_query.proto=github.com/Orisun/radic/v2/types --gogofaster_out=plugins=grpc:./index_service --proto_path=./index_service index.proto
 // 在windows上-I需使用绝对路径
 // --gogofaster_opt=M指示了.proto里的import转到.go里该怎么写，比如.proto里写import "doc.proto"，转到.go里就应该写 import "github.com/Orisun/radic/v2/types"
 // -I和--gogofaster_opt=M可以有多个

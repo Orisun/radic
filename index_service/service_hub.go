@@ -2,11 +2,11 @@ package index_service
 
 import (
 	"context"
-	"log"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/Orisun/radic/v2/util"
 	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	etcdv3 "go.etcd.io/etcd/client/v3"
 )
@@ -38,7 +38,7 @@ func GetServiceHub(etcdServers []string, heartbeatFrequency int64) *ServiceHub {
 					DialTimeout: 3 * time.Second,
 				},
 			); err != nil {
-				log.Fatalf("连接不上etcd服务器: %v", err) //发生log.Fatal时go进程会直接退出
+				util.Log.Fatalf("连接不上etcd服务器: %v", err) //发生log.Fatal时go进程会直接退出
 			} else {
 				serviceHub = &ServiceHub{
 					client:             client,
@@ -60,13 +60,13 @@ func (hub *ServiceHub) Regist(service string, endpoint string, leaseID etcdv3.Le
 	if leaseID <= 0 {
 		// 创建一个租约，有效期为heartbeatFrequency秒
 		if lease, err := hub.client.Grant(ctx, hub.heartbeatFrequency); err != nil {
-			log.Printf("创建租约失败：%v", err)
+			util.Log.Printf("创建租约失败：%v", err)
 			return 0, err
 		} else {
 			key := strings.TrimRight(SERVICE_ROOT_PATH, "/") + "/" + service + "/" + endpoint
 			// 服务注册
 			if _, err = hub.client.Put(ctx, key, "", etcdv3.WithLease(lease.ID)); err != nil { //只需要key，不需要value
-				log.Printf("写入服务%s对应的节点%s失败：%v", service, endpoint, err)
+				util.Log.Printf("写入服务%s对应的节点%s失败：%v", service, endpoint, err)
 				return lease.ID, err
 			} else {
 				return lease.ID, nil
@@ -77,10 +77,10 @@ func (hub *ServiceHub) Regist(service string, endpoint string, leaseID etcdv3.Le
 		if _, err := hub.client.KeepAliveOnce(ctx, leaseID); err == rpctypes.ErrLeaseNotFound { //续约一次，到期后还得再续约
 			return hub.Regist(service, endpoint, 0) //找不到租约，走注册流程(把leaseID置为0)
 		} else if err != nil {
-			log.Printf("续约失败:%v", err)
+			util.Log.Printf("续约失败:%v", err)
 			return 0, err
 		} else {
-			// log.Printf("服务%s对应的节点%s续约成功", service, endpoint)
+			// util.Log.Printf("服务%s对应的节点%s续约成功", service, endpoint)
 			return leaseID, nil
 		}
 	}
@@ -91,10 +91,10 @@ func (hub *ServiceHub) UnRegist(service string, endpoint string) error {
 	ctx := context.Background()
 	key := strings.TrimRight(SERVICE_ROOT_PATH, "/") + "/" + service + "/" + endpoint
 	if _, err := hub.client.Delete(ctx, key); err != nil {
-		log.Printf("注销服务%s对应的节点%s失败: %v", service, endpoint, err)
+		util.Log.Printf("注销服务%s对应的节点%s失败: %v", service, endpoint, err)
 		return err
 	} else {
-		log.Printf("注销服务%s对应的节点%s", service, endpoint)
+		util.Log.Printf("注销服务%s对应的节点%s", service, endpoint)
 		return nil
 	}
 }
@@ -104,7 +104,7 @@ func (hub *ServiceHub) getServiceEndpoints(service string) []string {
 	ctx := context.Background()
 	prefix := strings.TrimRight(SERVICE_ROOT_PATH, "/") + "/" + service + "/"
 	if resp, err := hub.client.Get(ctx, prefix, etcdv3.WithPrefix()); err != nil { //按前缀获取key-value
-		log.Printf("获取服务%s的节点失败: %v", service, err)
+		util.Log.Printf("获取服务%s的节点失败: %v", service, err)
 		return nil
 	} else {
 		endpoints := make([]string, 0, len(resp.Kvs))
@@ -113,7 +113,7 @@ func (hub *ServiceHub) getServiceEndpoints(service string) []string {
 			// fmt.Println(string(kv.Key), path[len(path)-1])
 			endpoints = append(endpoints, path[len(path)-1])
 		}
-		log.Printf("刷新%s服务对应的server -- %v\n", service, endpoints)
+		util.Log.Printf("刷新%s服务对应的server -- %v\n", service, endpoints)
 		return endpoints
 	}
 }
@@ -125,7 +125,7 @@ func (hub *ServiceHub) watchEndpointsOfService(service string) {
 	ctx := context.Background()
 	prefix := strings.TrimRight(SERVICE_ROOT_PATH, "/") + "/" + service + "/"
 	ch := hub.client.Watch(ctx, prefix, etcdv3.WithPrefix()) //根据前缀监听，每一个修改都会放入管道ch
-	log.Printf("监听服务%s的节点变化", service)
+	util.Log.Printf("监听服务%s的节点变化", service)
 	go func() {
 		for response := range ch { //遍历管道。这是个死循环，除非关闭管道
 			for _, event := range response.Events { //每次从ch里取出来的是事件的集合

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Orisun/radic/v2/internal/index_service"
+	"github.com/Orisun/radic/v2/index_service"
 	"github.com/Orisun/radic/v2/internal/kvdb"
 	"github.com/Orisun/radic/v2/types"
 	"github.com/Orisun/radic/v2/util"
@@ -29,7 +29,7 @@ func StartService() {
 	}
 
 	server := grpc.NewServer()
-	service := new(index_service.IndexService)
+	service := new(index_service.IndexServiceWorker)
 	service.Init(50000, kvdb.BADGER, util.RootPath+"data/local_db/book_badger", nil, 0) //不进行服务注册，client直连server
 	service.LoadFromIndexFile()                                                         //从文件中加载索引数据
 	// 注册服务的具体实现
@@ -130,4 +130,4 @@ func TestIndexService(t *testing.T) {
 	}
 }
 
-// go test -v ./internal/index_service/test -run=^TestIndexService$ -count=1
+// go test -v ./index_service/test -run=^TestIndexService$ -count=1
