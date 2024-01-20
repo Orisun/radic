@@ -12,6 +12,7 @@ require (
 	go.etcd.io/bbolt v1.3.8
 	go.etcd.io/etcd/api/v3 v3.5.11
 	go.etcd.io/etcd/client/v3 v3.5.11
+	golang.org/x/exp v0.0.0-20240112132812-db7319d0e0e3
 	google.golang.org/grpc v1.60.1
 )
 

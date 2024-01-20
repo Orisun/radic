@@ -92,11 +92,12 @@
             }
             $.ajax({
                 type: "POST",
-                url: "search",
-                contentType: "application/json",
-                dataType: 'json',
+                url: "/search",
                 timeout: 10000, //超时时间
-                beforeSend: function (XMLHttpRequest) {
+                headers: {
+                    UserName: encodeURI("高性能golang")  //写死UserName，实际中应该从浏览器的LocalStorage里取得用户的登录信息。包含中文时要进行encodeURI编码
+                },
+                beforeSend: function (request) {
                     $("#result").html("<img src='img/loading.gif' />"); //在后台返回success之前显示loading图标
                 },
                 data: JSON.stringify(param),
