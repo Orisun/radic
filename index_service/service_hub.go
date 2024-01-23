@@ -18,8 +18,7 @@ const (
 // 服务注册中心
 type ServiceHub struct {
 	client             *etcdv3.Client
-	heartbeatFrequency int64    //server每隔几秒钟不动向中心上报一次心跳（其实就是续一次租约）
-	endpointCache      sync.Map //维护每一个service下的所有servers
+	heartbeatFrequency int64 //server每隔几秒钟不动向中心上报一次心跳（其实就是续一次租约）
 	watched            sync.Map
 }
 
@@ -55,6 +54,8 @@ func GetServiceHub(etcdServers []string, heartbeatFrequency int64) *ServiceHub {
 // service 微服务的名称
 //
 // endpoint 微服务server的地址
+//
+// leaseID 租约ID,第一次注册时置为0即可
 func (hub *ServiceHub) Regist(service string, endpoint string, leaseID etcdv3.LeaseID) (etcdv3.LeaseID, error) {
 	ctx := context.Background()
 	if leaseID <= 0 {
@@ -100,7 +101,7 @@ func (hub *ServiceHub) UnRegist(service string, endpoint string) error {
 }
 
 // 服务发现。client每次进行RPC调用之前都查询etcd，获取server集合，然后采用负载均衡算法选择一台server。或者也可以把负载均衡的功能放到注册中心，即放到getServiceEndpoints函数里，让它只返回一个server
-func (hub *ServiceHub) getServiceEndpoints(service string) []string {
+func (hub *ServiceHub) GetServiceEndpoints(service string) []string {
 	ctx := context.Background()
 	prefix := strings.TrimRight(SERVICE_ROOT_PATH, "/") + "/" + service + "/"
 	if resp, err := hub.client.Get(ctx, prefix, etcdv3.WithPrefix()); err != nil { //按前缀获取key-value
@@ -114,47 +115,6 @@ func (hub *ServiceHub) getServiceEndpoints(service string) []string {
 			endpoints = append(endpoints, path[len(path)-1])
 		}
 		util.Log.Printf("刷新%s服务对应的server -- %v\n", service, endpoints)
-		return endpoints
-	}
-}
-
-func (hub *ServiceHub) watchEndpointsOfService(service string) {
-	if _, exists := hub.watched.LoadOrStore(service, true); exists {
-		return //监听过了，不用重复监听
-	}
-	ctx := context.Background()
-	prefix := strings.TrimRight(SERVICE_ROOT_PATH, "/") + "/" + service + "/"
-	ch := hub.client.Watch(ctx, prefix, etcdv3.WithPrefix()) //根据前缀监听，每一个修改都会放入管道ch
-	util.Log.Printf("监听服务%s的节点变化", service)
-	go func() {
-		for response := range ch { //遍历管道。这是个死循环，除非关闭管道
-			for _, event := range response.Events { //每次从ch里取出来的是事件的集合
-				path := strings.Split(string(event.Kv.Key), "/")
-				if len(path) > 2 {
-					service := path[len(path)-2]
-					// 跟etcd进行一次全量同步
-					endpoints := hub.getServiceEndpoints(service)
-					if len(endpoints) > 0 {
-						hub.endpointCache.Store(service, endpoints) //查询etcd的结果放入本地缓存
-					} else {
-						hub.endpointCache.Delete(service) //该service下已经没有endpoint
-					}
-				}
-			}
-		}
-	}()
-}
-
-// 服务发现。把第一次查询etcd的结果缓存起来，然后安装一个Watcher，仅etcd数据变化时更新本地缓存。这样可以降低etcd的访问压力
-func (hub *ServiceHub) GetServiceEndpointsWithCache(service string) []string {
-	hub.watchEndpointsOfService(service) //监听etcd的数据变化，及时更新本地缓存
-	if endpoints, exists := hub.endpointCache.Load(service); exists {
-		return endpoints.([]string)
-	} else {
-		endpoints := hub.getServiceEndpoints(service)
-		if len(endpoints) > 0 {
-			hub.endpointCache.Store(service, endpoints) //查询etcd的结果放入本地缓存
-		}
 		return endpoints
 	}
 }

@@ -2,10 +2,12 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"net"
 	"net/http"
-	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/Orisun/radic/v2/demo"
@@ -17,38 +19,56 @@ import (
 	"github.com/Orisun/radic/v2/types"
 	"github.com/Orisun/radic/v2/util"
 	"github.com/gogo/protobuf/proto"
+	"google.golang.org/grpc"
 
 	"github.com/gin-gonic/gin"
 )
 
 var (
-	dbType  = kvdb.BOLT
-	dbPath  = util.RootPath + "data/local_db/vedio_bolt"
-	indexer *index_service.Indexer
-	csvFile = util.RootPath + "data/bili_video.csv"
+	dbType      = kvdb.BOLT
+	dbPath      = util.RootPath + "data/local_db/vedio_bolt"
+	csvFile     = util.RootPath + "data/bili_video.csv"
+	etcdServers = []string{"127.0.0.1:2379"}
+	service     *index_service.IndexServiceWorker
 )
 
 // 从CSV文件重建索引
 func BuildIndex() {
 	os.Remove(dbPath) //先删除原有的索引文件
-	indexer = new(index_service.Indexer)
+	indexer := new(index_service.Indexer)
 	if err := indexer.Init(50000, dbType, dbPath); err != nil {
 		panic(err)
 	}
 	demo.BuildIndexFromFile(csvFile, indexer)
+	indexer.Close()
 }
 
-// 直接加载索引文件
-func LoadIndex() {
-	indexer = new(index_service.Indexer)
-	if err := indexer.Init(50000, dbType, dbPath); err != nil {
+func StopWorker() {
+	service.Close()
+}
+
+func StartWorker(port int) {
+	// 监听本地端口
+	lis, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(port))
+	if err != nil {
 		panic(err)
 	}
-	indexer.LoadFromIndexFile()
-}
 
-func CloseIndex() {
-	indexer.Close()
+	server := grpc.NewServer()
+	service = new(index_service.IndexServiceWorker)
+	service.Init(50000, dbType, dbPath+"_"+strconv.Itoa(port), etcdServers, port) //把自己注册到etcd
+	service.LoadFromIndexFile()                                                   //从文件中加载索引数据
+	// 注册服务的具体实现
+	index_service.RegisterIndexServiceServer(server, service)
+	go func(port int) {
+		// 启动服务
+		fmt.Printf("start grpc server on port %d\n", port)
+		err = server.Serve(lis) //Serve会一直阻塞，所以放到一个协程里异步执行
+		if err != nil {
+			service.Close()
+			fmt.Printf("start grpc server on port %d failed: %s\n", port, err)
+		}
+	}(port)
 }
 
 func clearnKeywords(words []string) []string {
@@ -86,7 +106,7 @@ func Search(ctx *gin.Context) {
 		query = query.And(types.NewTermQuery("author", strings.ToLower(request.Author))) //满足作者
 	}
 	orFlags := []uint64{demo.GetClassBits(request.Classes)} //满足类别
-	docs := indexer.Search(query, 0, 0, orFlags)
+	docs := service.Indexer.Search(query, 0, 0, orFlags)
 	videos := make([]demo.BiliVideo, 0, len(docs))
 	for _, doc := range docs {
 		var video demo.BiliVideo
@@ -117,7 +137,8 @@ func SearchAll(ctx *gin.Context) {
 	searchCtx := &video_search.VideoSearchContext{
 		Ctx:     context.Background(),
 		Request: &request,
-		Indexer: indexer,
+		// Indexer: service.Indexer,  //单机索引
+		Indexer: index_service.NewSentinel(etcdServers), //分布式索引
 	}
 	searcher := video_search.VideoSearcher{}
 	searcher.WithRecaller(recaller.KeywordRecaller{})
@@ -142,15 +163,16 @@ func SearchByAuthor(ctx *gin.Context) {
 		return
 	}
 
-	userName, err := url.QueryUnescape(ctx.Request.Header.Get("UserName"))
-	if err != nil || len(userName) == 0 {
+	userName, ok := ctx.Value("user_name").(string) //从gin.Context里取得userName
+	if !ok || len(userName) == 0 {
 		ctx.String(http.StatusBadRequest, "获取不到登录用户名")
 		return
 	}
 	searchCtx := &video_search.VideoSearchContext{
-		Ctx:     context.WithValue(context.Background(), "user_name", userName), //从request header里获得user_name，再放到context里
+		Ctx:     context.WithValue(context.Background(), "user_name", userName), //把userName放到context里
 		Request: &request,
-		Indexer: indexer,
+		// Indexer: service.Indexer,  //单机索引
+		Indexer: index_service.NewSentinel(etcdServers), //分布式索引
 	}
 	searcher := video_search.VideoSearcher{}
 	searcher.WithRecaller(recaller.KeywordAuthorRecaller{})

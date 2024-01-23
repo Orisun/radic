@@ -15,7 +15,7 @@ const (
 )
 
 type IndexServiceWorker struct {
-	indexer *Indexer // 把正排和倒排索引放到一起
+	Indexer *Indexer // 把正排和倒排索引放到一起
 	//跟服务注册相关的配置
 	hub      *ServiceHub
 	selfAddr string
@@ -23,8 +23,8 @@ type IndexServiceWorker struct {
 
 // 初始化索引
 func (service *IndexServiceWorker) Init(DocNumEstimate int, dbtype int, DataDir string, etcdServers []string, servicePort int) error {
-	service.indexer = new(Indexer)
-	service.indexer.Init(DocNumEstimate, dbtype, DataDir)
+	service.Indexer = new(Indexer)
+	service.Indexer.Init(DocNumEstimate, dbtype, DataDir)
 
 	// 向注册中心注册自己
 	if len(etcdServers) > 0 {
@@ -61,32 +61,32 @@ func (service *IndexServiceWorker) Close() error {
 	if service.hub != nil {
 		service.hub.UnRegist(INDEX_SERVICE, service.selfAddr)
 	}
-	return service.indexer.Close()
+	return service.Indexer.Close()
 }
 
 // 从索引上删除文档
 func (service *IndexServiceWorker) DeleteDoc(ctx context.Context, docId *DocId) (*AffectedCount, error) {
-	return &AffectedCount{int32(service.indexer.DeleteDoc(docId.DocId))}, nil
+	return &AffectedCount{int32(service.Indexer.DeleteDoc(docId.DocId))}, nil
 }
 
 // 向索引中添加文档(如果已存在，会先删除)
 func (service *IndexServiceWorker) AddDoc(ctx context.Context, doc *types.Document) (*AffectedCount, error) {
-	n, err := service.indexer.AddDoc(*doc)
+	n, err := service.Indexer.AddDoc(*doc)
 	return &AffectedCount{int32(n)}, err
 }
 
 // 系统重启时，直接从索引文件里加载数据
 func (service *IndexServiceWorker) LoadFromIndexFile() int {
-	return service.indexer.LoadFromIndexFile()
+	return service.Indexer.LoadFromIndexFile()
 }
 
 // 检索，返回文档列表
 func (service *IndexServiceWorker) Search(ctx context.Context, request *SearchRequest) (*SearchResult, error) {
-	result := service.indexer.Search(request.Query, request.OnFlag, request.OffFlag, request.OrFlags)
+	result := service.Indexer.Search(request.Query, request.OnFlag, request.OffFlag, request.OrFlags)
 	return &SearchResult{Results: result}, nil
 }
 
 // 遍历倒排索引
 func (service *IndexServiceWorker) IterReverseIndex(f func(key string, value any)) {
-	service.indexer.IterReverseIndex(f)
+	service.Indexer.IterReverseIndex(f)
 }

@@ -16,14 +16,14 @@ import (
 )
 
 type Sentinel struct {
-	hub      *ServiceHub // 从Hub上获取IndexServiceWorker集合
+	hub      IServiceHub // 从Hub上获取IndexServiceWorker集合。可能是直接访问ServiceHub，也可能是走代理
 	connPool sync.Map    // 与各个IndexServiceWorker建立的连接。把连接缓存起来，避免每次都重建连接
 }
 
 func NewSentinel(etcdServers []string) *Sentinel {
-	hub := GetServiceHub(etcdServers, 0)
 	return &Sentinel{
-		hub:      hub,
+		hub: GetServiceHub(etcdServers, 3), //直接访问ServiceHub
+		// hub: GetServiceHubProxy(etcdServers, 3, 100),  //走代理
 		connPool: sync.Map{},
 	}
 }
@@ -60,7 +60,7 @@ func (sentinel *Sentinel) GetGrpcConn(endpoint string) *grpc.ClientConn {
 
 // 向集群中添加文档(如果已存在，会先删除)
 func (sentinel *Sentinel) AddDoc(doc types.Document) (int, error) {
-	endpoints := sentinel.hub.GetServiceEndpointsWithCache(INDEX_SERVICE)
+	endpoints := sentinel.hub.GetServiceEndpoints(INDEX_SERVICE)
 	if len(endpoints) == 0 {
 		return 0, fmt.Errorf("no index worker")
 	}
@@ -81,7 +81,7 @@ func (sentinel *Sentinel) AddDoc(doc types.Document) (int, error) {
 
 // 从集群上删除docId，返回成功删除的doc数（正常情况下不会超过1）
 func (sentinel *Sentinel) DeleteDoc(docId string) int {
-	endpoints := sentinel.hub.GetServiceEndpointsWithCache(INDEX_SERVICE)
+	endpoints := sentinel.hub.GetServiceEndpoints(INDEX_SERVICE)
 	if len(endpoints) == 0 {
 		return 0
 	}
@@ -111,7 +111,7 @@ func (sentinel *Sentinel) DeleteDoc(docId string) int {
 }
 
 func (sentinel *Sentinel) Search(query *types.TermQuery, onFlag uint64, offFlag uint64, orFlags []uint64) []*types.Document {
-	endpoints := sentinel.hub.GetServiceEndpointsWithCache(INDEX_SERVICE)
+	endpoints := sentinel.hub.GetServiceEndpoints(INDEX_SERVICE)
 	if len(endpoints) == 0 {
 		return nil
 	}
