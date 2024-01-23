@@ -32,7 +32,6 @@ func main() {
 	if *rebuildIndex {
 		handler.BuildIndex() //重建索引
 	}
-	// handler.LoadIndex() //加载建好的索引。单机索引使用这一行
 	handler.StartWorker(*workerPort) //作为分布式索引的一台worker启动。分布式索引使用这一行
 
 	engine := gin.Default()

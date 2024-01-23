@@ -20,6 +20,7 @@ type ServiceHub struct {
 	client             *etcdv3.Client
 	heartbeatFrequency int64 //server每隔几秒钟不动向中心上报一次心跳（其实就是续一次租约）
 	watched            sync.Map
+	loadBalancer       LoadBalancer //策略模式。完成同一个任务可以有多种不同的实现方案
 }
 
 var (
@@ -42,6 +43,7 @@ func GetServiceHub(etcdServers []string, heartbeatFrequency int64) *ServiceHub {
 				serviceHub = &ServiceHub{
 					client:             client,
 					heartbeatFrequency: heartbeatFrequency, //租约的有效期
+					loadBalancer:       &RoundRobin{},
 				}
 			}
 		}
@@ -117,4 +119,8 @@ func (hub *ServiceHub) GetServiceEndpoints(service string) []string {
 		util.Log.Printf("刷新%s服务对应的server -- %v\n", service, endpoints)
 		return endpoints
 	}
+}
+
+func (hub *ServiceHub) GetServiceEndpoint(service string) string {
+	return hub.loadBalancer.Take(hub.GetServiceEndpoints(service))
 }

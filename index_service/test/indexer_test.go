@@ -9,10 +9,8 @@ import (
 
 	"github.com/Orisun/radic/v2/index_service"
 	"github.com/Orisun/radic/v2/internal/kvdb"
-	reverseindex "github.com/Orisun/radic/v2/internal/reverse_index"
 	"github.com/Orisun/radic/v2/types"
 	"github.com/Orisun/radic/v2/util"
-	"github.com/huandu/skiplist"
 )
 
 type Book struct {
@@ -171,18 +169,6 @@ func TestLoadFromIndexFile(t *testing.T) {
 	} else {
 		util.Log.Printf("load %d document from invere document", n)
 	}
-	indexer.IterReverseIndex(func(key string, value any) {
-		skv := value.(*skiplist.SkipList)
-		fmt.Printf("%s ", key)
-		node := skv.Front()
-		for node != nil {
-			fmt.Printf("%d_", node.Key().(uint64)) //IntId_
-			v := node.Value.(reverseindex.SkipListValue)
-			fmt.Printf("%s_%b ", v.Id, v.BitsFeature) //DocId_BitsFeature
-			node = node.Next()
-		}
-		fmt.Println()
-	})
 
 	q1 := types.NewTermQuery("title", "生命起源")
 	q2 := types.NewTermQuery("content", "文物")

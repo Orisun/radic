@@ -85,8 +85,3 @@ func (service *IndexServiceWorker) Search(ctx context.Context, request *SearchRe
 	result := service.Indexer.Search(request.Query, request.OnFlag, request.OffFlag, request.OrFlags)
 	return &SearchResult{Results: result}, nil
 }
-
-// 遍历倒排索引
-func (service *IndexServiceWorker) IterReverseIndex(f func(key string, value any)) {
-	service.Indexer.IterReverseIndex(f)
-}

@@ -22,7 +22,7 @@ func TestSkipList(t *testing.T) {
 	node := list.Front()
 	for node != nil {
 		fmt.Println(node.Key(), node.Value)
-		node = node.Next()
+		node = node.Next() //迭代器模式
 	}
 }
 

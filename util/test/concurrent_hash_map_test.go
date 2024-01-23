@@ -1,6 +1,7 @@
 package test
 
 import (
+	"fmt"
 	"math/rand"
 	"strconv"
 	"sync"
@@ -92,6 +93,19 @@ func BenchmarkSynMap(b *testing.B) {
 	}
 }
 
+func TestConcurrentHashMapIterator(t *testing.T) {
+	for i := 0; i < 10; i++ {
+		conMp.Set(strconv.Itoa(i), i)
+	}
+	iterator := conMp.CreateIterator()
+	entry := iterator.Next()
+	for entry != nil {
+		fmt.Println(entry.Key, entry.Value)
+		entry = iterator.Next()
+	}
+}
+
+// go test -v ./util/test -run=^TestConcurrentHashMapIterator$ -count=1
 // go test ./util/test -bench=Map -run=^$ -count=1 -benchmem -benchtime=3s
 /*
 goos: windows

@@ -15,6 +15,7 @@ type IServiceHub interface {
 	Regist(service string, endpoint string, leaseID etcdv3.LeaseID) (etcdv3.LeaseID, error) // 注册服务
 	UnRegist(service string, endpoint string) error                                         // 注销服务
 	GetServiceEndpoints(service string) []string                                            //服务发现
+	GetServiceEndpoint(service string) string                                               //选择服务的一台endpoint
 }
 
 // 代理模式。对ServiceHub做一层代理，想访问endpoints时需要通过代理，代理提供了2个功能：缓存和限流保护
@@ -22,6 +23,7 @@ type HubProxy struct {
 	hub           *ServiceHub
 	endpointCache sync.Map //维护每一个service下的所有servers
 	limiter       *rate.Limiter
+	loadBalancer  LoadBalancer
 }
 
 var (
@@ -50,7 +52,8 @@ func GetServiceHubProxy(etcdServers []string, heartbeatFrequency int64, qps int)
 				proxy = &HubProxy{
 					hub:           serviceHub,
 					endpointCache: sync.Map{},
-					limiter:       rate.NewLimiter(rate.Every(time.Duration(1e9/qps)*time.Nanosecond), 1), //每隔1E9/qps纳秒产生一个令牌，即一秒钟之内产生qps个令牌
+					limiter:       rate.NewLimiter(rate.Every(time.Duration(1e9/qps)*time.Nanosecond), qps), //每隔1E9/qps纳秒产生一个令牌，即一秒钟之内产生qps个令牌。令牌桶的容量为qps
+					loadBalancer:  &RandomSelect{},
 				}
 			}
 		}
@@ -101,13 +104,13 @@ func (proxy *HubProxy) watchEndpointsOfService(service string) {
 //
 // 同时加上限流保护
 func (proxy *HubProxy) GetServiceEndpoints(service string) []string {
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-	proxy.limiter.Wait(ctx) //阻塞，直到桶中有1个令牌或超时。
+	// ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	// defer cancel()
+	// proxy.limiter.Wait(ctx) //阻塞，直到桶中有1个令牌或超时。
 
-	// if !proxy.limiter.Allow(time.Now()) { //不阻塞，如果桶中没有1个令牌，则函数直接返回空，即没有可用的endpoints
-	// 	return nil
-	// }
+	if !proxy.limiter.Allow() { //不阻塞，如果桶中没有1个令牌，则函数直接返回空，即没有可用的endpoints
+		return nil
+	}
 
 	proxy.watchEndpointsOfService(service) //监听etcd的数据变化，及时更新本地缓存
 	if endpoints, exists := proxy.endpointCache.Load(service); exists {
@@ -119,4 +122,8 @@ func (proxy *HubProxy) GetServiceEndpoints(service string) []string {
 		}
 		return endpoints
 	}
+}
+
+func (proxy *HubProxy) GetServiceEndpoint(service string) string {
+	return proxy.loadBalancer.Take(proxy.GetServiceEndpoints(service))
 }

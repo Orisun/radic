@@ -54,11 +54,6 @@ func (indexer *SkipListReverseIndex) Add(doc types.Document) {
 	}
 }
 
-// 遍历倒排索引
-func (indexer *SkipListReverseIndex) Iter(f func(key string, value any)) {
-	indexer.table.Iter(f)
-}
-
 // 从key上删除对应的doc
 func (indexer *SkipListReverseIndex) Delete(IntId uint64, keyword *types.Keyword) {
 	key := keyword.ToString()

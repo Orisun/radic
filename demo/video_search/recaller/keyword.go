@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/Orisun/radic/v2/demo"
-	"github.com/Orisun/radic/v2/demo/video_search"
+	"github.com/Orisun/radic/v2/demo/video_search/common"
 	"github.com/Orisun/radic/v2/types"
 	"github.com/gogo/protobuf/proto"
 )
@@ -12,7 +12,7 @@ import (
 type KeywordRecaller struct {
 }
 
-func (KeywordRecaller) Recall(ctx *video_search.VideoSearchContext) []*demo.BiliVideo {
+func (KeywordRecaller) Recall(ctx *common.VideoSearchContext) []*demo.BiliVideo {
 	request := ctx.Request
 	if request == nil {
 		return nil

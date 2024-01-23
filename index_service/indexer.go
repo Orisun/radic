@@ -135,8 +135,3 @@ func (indexer *Indexer) Search(query *types.TermQuery, onFlag uint64, offFlag ui
 	}
 	return result
 }
-
-// 遍历倒排索引
-func (indexer *Indexer) IterReverseIndex(f func(key string, value any)) {
-	indexer.reverseIndex.Iter(f)
-}

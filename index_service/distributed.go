@@ -3,7 +3,6 @@ package index_service
 import (
 	context "context"
 	"fmt"
-	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -22,8 +21,8 @@ type Sentinel struct {
 
 func NewSentinel(etcdServers []string) *Sentinel {
 	return &Sentinel{
-		hub: GetServiceHub(etcdServers, 3), //直接访问ServiceHub
-		// hub: GetServiceHubProxy(etcdServers, 3, 100),  //走代理
+		// hub: GetServiceHub(etcdServers, 3), //直接访问ServiceHub
+		hub:      GetServiceHubProxy(etcdServers, 3, 100), //走代理
 		connPool: sync.Map{},
 	}
 }
@@ -33,6 +32,7 @@ func (sentinel *Sentinel) GetGrpcConn(endpoint string) *grpc.ClientConn {
 		conn := v.(*grpc.ClientConn)
 		//如果连接状态不可用，则从连接缓存中删除
 		if conn.GetState() == connectivity.TransientFailure || conn.GetState() == connectivity.Shutdown {
+			util.Log.Printf("connection status to endpoint %s is %s", endpoint, conn.GetState())
 			conn.Close()
 			sentinel.connPool.Delete(endpoint)
 		} else {
@@ -60,12 +60,10 @@ func (sentinel *Sentinel) GetGrpcConn(endpoint string) *grpc.ClientConn {
 
 // 向集群中添加文档(如果已存在，会先删除)
 func (sentinel *Sentinel) AddDoc(doc types.Document) (int, error) {
-	endpoints := sentinel.hub.GetServiceEndpoints(INDEX_SERVICE)
-	if len(endpoints) == 0 {
-		return 0, fmt.Errorf("no index worker")
+	endpoint := sentinel.hub.GetServiceEndpoint(INDEX_SERVICE) // 根据负载均衡策略，选择一台index worker，把doc添加到它上面去
+	if len(endpoint) == 0 {
+		return 0, fmt.Errorf("there is no alive index worker")
 	}
-	idx := rand.Intn(len(endpoints)) // 随机选择一台index worker，把doc添加到它上面去
-	endpoint := endpoints[idx]
 	conn := sentinel.GetGrpcConn(endpoint)
 	if conn == nil {
 		return 0, fmt.Errorf("connect to worker %s failed", endpoint)

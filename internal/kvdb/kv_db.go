@@ -13,8 +13,6 @@ const (
 	BADGER
 )
 
-// Stratergy模式，完成同一个任务可以有多种不同的实现方案
-//
 // redis也是一种KV数据库，读者可以自行用redis实现IKeyValueDB接口
 type IKeyValueDB interface {
 	Open() error                              //初始化DB

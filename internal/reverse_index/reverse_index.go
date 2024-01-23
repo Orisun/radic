@@ -6,5 +6,4 @@ type IReverseIndexer interface {
 	Add(doc types.Document)                                                              //添加一个doc
 	Delete(IntId uint64, keyword *types.Keyword)                                         //从key上删除对应的doc
 	Search(q *types.TermQuery, onFlag uint64, offFlag uint64, orFlags []uint64) []string //查找,返回业务侧文档ID
-	Iter(func(key string, value any))                                                    //遍历倒排索引（用于调试）
 }

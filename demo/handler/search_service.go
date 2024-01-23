@@ -12,8 +12,7 @@ import (
 
 	"github.com/Orisun/radic/v2/demo"
 	"github.com/Orisun/radic/v2/demo/video_search"
-	"github.com/Orisun/radic/v2/demo/video_search/filter"
-	"github.com/Orisun/radic/v2/demo/video_search/recaller"
+	"github.com/Orisun/radic/v2/demo/video_search/common"
 	"github.com/Orisun/radic/v2/index_service"
 	"github.com/Orisun/radic/v2/internal/kvdb"
 	"github.com/Orisun/radic/v2/types"
@@ -30,6 +29,7 @@ var (
 	csvFile     = util.RootPath + "data/bili_video.csv"
 	etcdServers = []string{"127.0.0.1:2379"}
 	service     *index_service.IndexServiceWorker
+	indexer     index_service.IIndexer
 )
 
 // 从CSV文件重建索引
@@ -69,6 +69,8 @@ func StartWorker(port int) {
 			fmt.Printf("start grpc server on port %d failed: %s\n", port, err)
 		}
 	}(port)
+	// indexer=service.Indexer  //单机索引
+	indexer = index_service.NewSentinel(etcdServers) //分布式索引
 }
 
 func clearnKeywords(words []string) []string {
@@ -134,15 +136,12 @@ func SearchAll(ctx *gin.Context) {
 		return
 	}
 
-	searchCtx := &video_search.VideoSearchContext{
+	searchCtx := &common.VideoSearchContext{
 		Ctx:     context.Background(),
 		Request: &request,
-		// Indexer: service.Indexer,  //单机索引
-		Indexer: index_service.NewSentinel(etcdServers), //分布式索引
+		Indexer: indexer,
 	}
-	searcher := video_search.VideoSearcher{}
-	searcher.WithRecaller(recaller.KeywordRecaller{})
-	searcher.WithFilter(filter.ViewFilter{})
+	searcher := video_search.NewAllVedioSearcher()
 	videos := searcher.Search(searchCtx)
 
 	ctx.JSON(http.StatusOK, videos) //把搜索结果以json形式返回给前端
@@ -168,15 +167,12 @@ func SearchByAuthor(ctx *gin.Context) {
 		ctx.String(http.StatusBadRequest, "获取不到登录用户名")
 		return
 	}
-	searchCtx := &video_search.VideoSearchContext{
+	searchCtx := &common.VideoSearchContext{
 		Ctx:     context.WithValue(context.Background(), "user_name", userName), //把userName放到context里
 		Request: &request,
-		// Indexer: service.Indexer,  //单机索引
-		Indexer: index_service.NewSentinel(etcdServers), //分布式索引
+		Indexer: indexer,
 	}
-	searcher := video_search.VideoSearcher{}
-	searcher.WithRecaller(recaller.KeywordAuthorRecaller{})
-	searcher.WithFilter(filter.ViewFilter{})
+	searcher := video_search.NewUpVedioSearcher()
 	videos := searcher.Search(searchCtx)
 
 	ctx.JSON(http.StatusOK, videos) //把搜索结果以json形式返回给前端

@@ -2,13 +2,13 @@ package filter
 
 import (
 	"github.com/Orisun/radic/v2/demo"
-	"github.com/Orisun/radic/v2/demo/video_search"
+	"github.com/Orisun/radic/v2/demo/video_search/common"
 )
 
 type ViewFilter struct {
 }
 
-func (ViewFilter) Apply(ctx *video_search.VideoSearchContext) {
+func (ViewFilter) Apply(ctx *common.VideoSearchContext) {
 	request := ctx.Request
 	if request == nil {
 		return
