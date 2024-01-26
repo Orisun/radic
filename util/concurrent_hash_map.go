@@ -2,7 +2,6 @@ package util
 
 import (
 	"sync"
-
 	farmhash "github.com/leemcloughlin/gofarmhash"
 	"golang.org/x/exp/maps"
 )
@@ -21,7 +20,7 @@ func NewConcurrentHashMap(seg, cap int) *ConcurrentHashMap {
 	locks := make([]sync.RWMutex, seg)
 	for i := 0; i < seg; i++ {
 		mps[i] = make(map[string]any, cap/seg)
-		locks[i] = sync.RWMutex{}
+		// locks[i] = sync.RWMutex{}
 	}
 	return &ConcurrentHashMap{
 		mps:   mps,
@@ -33,7 +32,7 @@ func NewConcurrentHashMap(seg, cap int) *ConcurrentHashMap {
 
 // 判断key对应到哪个小map
 func (m *ConcurrentHashMap) getSegIndex(key string) int {
-	hash := int(farmhash.Hash32WithSeed([]byte(key), m.seed))
+	hash := int(farmhash.Hash32WithSeed([]byte(key), m.seed)) //FarmHash是google开源的Hash算法
 	return hash % m.seg
 }
 
