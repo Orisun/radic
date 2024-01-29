@@ -141,18 +141,18 @@ func UnionsetOfSkipList(lists ...*skiplist.SkipList) *skiplist.SkipList {
 }
 
 // 按照bits特征进行过滤
-func (indexer SkipListReverseIndex) FilterByBits(flag uint64, onFlag uint64, offFlag uint64, orFlags []uint64) bool {
+func (indexer SkipListReverseIndex) FilterByBits(bits uint64, onFlag uint64, offFlag uint64, orFlags []uint64) bool {
 	//onFlag所有bit必须全部命中
-	if flag&onFlag != onFlag {
+	if bits&onFlag != onFlag {
 		return false
 	}
 	//offFlag所有bit必须全部不命中
-	if flag&offFlag != 0 {
+	if bits&offFlag != 0 {
 		return false
 	}
 	//多个orFlags必须全部命中
 	for _, orFlag := range orFlags {
-		if orFlag > 0 && flag&orFlag <= 0 { //单个orFlag只人有一个bit命中即可
+		if orFlag > 0 && bits&orFlag <= 0 { //单个orFlag只人有一个bit命中即可
 			return false
 		}
 	}

@@ -1,52 +1,51 @@
-// Deprecated 这是反面教材，多层函数嵌套。正面教材参见 term_query
 package types
 
 import "strings"
 
-type RetrieveExpression struct {
-	Must    []RetrieveExpression
-	Should  []RetrieveExpression
+type TermQueryV0 struct {
+	Must    []TermQueryV0
+	Should  []TermQueryV0
 	Keyword string
 }
 
-func (exp RetrieveExpression) Empty() bool {
+func (exp TermQueryV0) Empty() bool {
 	return len(exp.Keyword) == 0 && len(exp.Must) == 0 && len(exp.Should) == 0
 }
 
-func KeywordExpression(keyword string) RetrieveExpression {
-	return RetrieveExpression{Keyword: keyword}
+func KeywordExpression(keyword string) TermQueryV0 {
+	return TermQueryV0{Keyword: keyword}
 }
 
-func MustExpression(exps ...RetrieveExpression) RetrieveExpression {
+func MustExpression(exps ...TermQueryV0) TermQueryV0 {
 	if len(exps) == 0 {
-		return RetrieveExpression{}
+		return TermQueryV0{}
 	}
-	array := make([]RetrieveExpression, 0, len(exps))
+	array := make([]TermQueryV0, 0, len(exps))
 	//非空的Expression才能添加到array里面去
 	for _, exp := range exps {
 		if !exp.Empty() {
 			array = append(array, exp)
 		}
 	}
-	return RetrieveExpression{Must: array}
+	return TermQueryV0{Must: array}
 }
 
-func ShouldExpression(exps ...RetrieveExpression) RetrieveExpression {
+func ShouldExpression(exps ...TermQueryV0) TermQueryV0 {
 	if len(exps) == 0 {
-		return RetrieveExpression{}
+		return TermQueryV0{}
 	}
-	array := make([]RetrieveExpression, 0, len(exps))
+	array := make([]TermQueryV0, 0, len(exps))
 	//非空的Expression才能添加到array里面去
 	for _, exp := range exps {
 		if !exp.Empty() {
 			array = append(array, exp)
 		}
 	}
-	return RetrieveExpression{Should: array}
+	return TermQueryV0{Should: array}
 }
 
 //print函数会自动调用变量的String()方法
-func (exp RetrieveExpression) String() string {
+func (exp TermQueryV0) String() string {
 	if len(exp.Keyword) > 0 {
 		return exp.Keyword
 	} else if len(exp.Must) > 0 {

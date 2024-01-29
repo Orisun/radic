@@ -7,10 +7,11 @@ import (
 	"github.com/Orisun/radic/v2/types"
 )
 
-const FIELD = "title"
+const FIELD = ""
+
+// ((A|B|C)&D)|E&((F|G)&H)
 
 func TestTermQuery(t *testing.T) {
-	// A|B|C&D|E&(F|G)&H
 	A := types.NewTermQuery(FIELD, "") //空Expression
 	B := types.NewTermQuery(FIELD, "B")
 	C := types.NewTermQuery(FIELD, "C")
@@ -28,6 +29,7 @@ func TestTermQuery(t *testing.T) {
 	q = B.Or(C)
 	fmt.Println(q.ToString())
 
+	// ((A|B|C)&D)|E&((F|G)&H)
 	q = A.Or(B).Or(C).And(D).Or(E).And(F.Or(G)).And(H)
 	fmt.Println(q.ToString())
 }
