@@ -16,6 +16,7 @@ type Bolt struct {
 	bucket []byte
 }
 
+// Builder模式
 func (s *Bolt) WithDataPath(path string) *Bolt {
 	s.path = path
 	return s

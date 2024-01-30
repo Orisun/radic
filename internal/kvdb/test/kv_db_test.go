@@ -3,9 +3,22 @@ package test
 import (
 	"errors"
 	"fmt"
+	"testing"
 
 	"github.com/Orisun/radic/v2/internal/kvdb"
 )
+
+var (
+	db       kvdb.IKeyValueDB
+	setup    func() //测试之前执行一些初始化工作
+	teardown func() //测试之后执行一些收尾工作
+)
+
+func init() {
+	teardown = func() {
+		db.Close()
+	}
+}
 
 func testGetDbPath(db kvdb.IKeyValueDB) error {
 	fmt.Println("db path", db.GetDbPath())
@@ -118,4 +131,33 @@ func testIterDB(db kvdb.IKeyValueDB) error {
 	})
 
 	return nil
+}
+
+func testPipeline(t *testing.T) { //整个测试流
+	defer teardown()
+	setup()
+
+	testGetDbPath(db)
+	fmt.Println()
+
+	err := testGetSetDelete(db)
+	if err != nil {
+		fmt.Println(err)
+		t.Fail()
+	}
+	fmt.Println()
+
+	err = testBatchGetSetDelete(db)
+	if err != nil {
+		fmt.Println(err)
+		t.Fail()
+	}
+	fmt.Println()
+
+	err = testIterDB(db)
+	if err != nil {
+		fmt.Println(err)
+		t.Fail()
+	}
+	fmt.Println()
 }
