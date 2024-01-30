@@ -30,27 +30,27 @@ type IKeyValueDB interface {
 }
 
 // Factory工厂模式，把类的创建和使用分隔开。Get函数就是一个工厂，它返回产品的接口，即它可以返回各种各样的具体产品。
-func GetKvDb(dbtype int, DataDir string) (IKeyValueDB, error) { //通过Get函数【使用类】
-	dirPath := strings.Split(DataDir, "/")
-	baseDir := strings.Join(dirPath[0:len(dirPath)-1], "/")
+func GetKvDb(dbtype int, path string) (IKeyValueDB, error) { //通过Get函数【使用类】
+	paths := strings.Split(path, "/")
+	parentPath := strings.Join(paths[0:len(paths)-1], "/") //父路径
 
-	info, err := os.Stat(baseDir)
-	if os.IsNotExist(err) {
-		util.Log.Printf("create dir %s", baseDir)
-		os.MkdirAll(baseDir, 0o600)
-	} else {
-		if info.Mode().IsRegular() {
-			util.Log.Printf("%s is a regular file, will delete it", baseDir)
-			os.Remove(baseDir)
+	info, err := os.Stat(parentPath)
+	if os.IsNotExist(err) { //如果父路径不存在则创建
+		util.Log.Printf("create dir %s", parentPath)
+		os.MkdirAll(parentPath, 0o600) //数字前的0或0o都表示八进制
+	} else { //父路径存在
+		if info.Mode().IsRegular() { //如果父路径是个普通文件，则把它删掉
+			util.Log.Printf("%s is a regular file, will delete it", parentPath)
+			os.Remove(parentPath)
 		}
 	}
 
 	var db IKeyValueDB
 	switch dbtype {
 	case BADGER:
-		db = new(Badger).WithDataPath(DataDir)
+		db = new(Badger).WithDataPath(path)
 	default: //默认使用bolt
-		db = new(Bolt).WithDataPath(DataDir).WithBucket("radic") //Builder生成器模式
+		db = new(Bolt).WithDataPath(path).WithBucket("radic") //Builder生成器模式
 	}
 	err = db.Open() //创建具体KVDB的细节隐藏在Open()函数里。在这里【创建类】
 	return db, err
