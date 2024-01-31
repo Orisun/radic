@@ -178,11 +178,97 @@ func DumpDataFromFile2DB3(csvFile string) {
 
 func checkErr(err error) {
 	// et := reflect.TypeOf(err).Elem()
-	// fmt.Println(et.PkgPath(), et.Name(), et)
+	// fmt.Println(et, et.PkgPath(), et.Name())
 	var sqlErr *mysql.MySQLError
 	if errors.As(err, &sqlErr) {
 		if sqlErr.Number != 1062 {
 			panic(err)
 		}
 	}
+}
+
+// 一条最简单的select读出全表
+func ReadAllTable1(ch chan<- BiliVideo) {
+	begin := time.Now()
+	defer func(begin time.Time) {
+		fmt.Printf("ReadAllTable1 use time %d ms\n", time.Since(begin).Milliseconds())
+	}(begin)
+
+	db := GetSearchDBConnection()
+	var datas []BiliVideo
+	// select * from bili_video; 绝对禁止这种写法，绝对是慢查询
+	if err := db.Select("*").Find(&datas).Error; err != nil {
+		log.Printf("ReadAllTable1 failed: %s", err)
+	}
+	for _, data := range datas {
+		ch <- data
+	}
+	log.Printf("ReadAllTable1 read %d records", len(datas))
+	close(ch)
+}
+
+// 普通的分页查询遍历全表
+func ReadAllTable2(ch chan<- BiliVideo) {
+	begin := time.Now()
+	defer func(begin time.Time) {
+		fmt.Printf("ReadAllTable2 use time %d ms\n", time.Since(begin).Milliseconds())
+	}(begin)
+
+	db := GetSearchDBConnection()
+	offset := 0
+	const BATCH = 500
+	for {
+		t0 := time.Now()
+		var datas []BiliVideo
+		// select * from bili_video limit offset,BATCH; 实际上执行的是 limit 0,offset+BATCH, 然后截取了最后BATCH个，所以offset越大执行得越慢
+		if err := db.Select("*").Offset(offset).Limit(BATCH).Find(&datas).Error; err != nil {
+			log.Printf("ReadAllTable2 failed: %s", err)
+			break
+		} else {
+			if len(datas) == 0 {
+				break
+			}
+			for _, data := range datas {
+				ch <- data
+			}
+			offset += len(datas)
+		}
+		fmt.Printf("offset=%d use time %dms\n", offset, time.Since(t0).Milliseconds())
+	}
+	log.Printf("ReadAllTable2 read %d records", offset)
+	close(ch)
+}
+
+// 借助于主键的有序性，分区段遍历全表
+func ReadAllTable3(ch chan<- BiliVideo) {
+	begin := time.Now()
+	defer func(begin time.Time) {
+		fmt.Printf("ReadAllTable3 use time %d ms\n", time.Since(begin).Milliseconds())
+	}(begin)
+
+	db := GetSearchDBConnection()
+	maxid := ""
+	const BATCH = 500
+	total := 0
+	for {
+		t0 := time.Now()
+		var datas []BiliVideo
+		// select * from bili_video where id>maxid limit BATCH; 默认自带 order by id
+		if err := db.Select("*").Where("id>?", maxid).Limit(BATCH).Find(&datas).Error; err != nil {
+			log.Printf("ReadAllTable2 failed: %s", err)
+			break
+		} else {
+			if len(datas) == 0 {
+				break
+			}
+			for _, data := range datas {
+				ch <- data
+			}
+			maxid = datas[len(datas)-1].Id //最后一个元素的id是最大的
+			total += len(datas)
+		}
+		fmt.Printf("progress=%d use time %dms\n", total, time.Since(t0).Milliseconds())
+	}
+	log.Printf("ReadAllTable3 read %d records", total)
+	close(ch)
 }

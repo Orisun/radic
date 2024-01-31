@@ -21,8 +21,8 @@ type Sentinel struct {
 
 func NewSentinel(etcdServers []string) *Sentinel {
 	return &Sentinel{
-		// hub: GetServiceHub(etcdServers, 3), //直接访问ServiceHub
-		hub:      GetServiceHubProxy(etcdServers, 3, 100), //走代理
+		// hub: GetServiceHub(etcdServers, 10), //直接访问ServiceHub
+		hub:      GetServiceHubProxy(etcdServers, 10, 100), //走代理HubProxy
 		connPool: sync.Map{},
 	}
 }

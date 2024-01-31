@@ -9,7 +9,7 @@ import (
 
 type VideoSearchContext struct {
 	Ctx     context.Context        //上下文参数
-	Indexer index_service.IIndexer //索引。装饰器模式，搜索请求委派给的目标对象可能是本地的Indexer，也可能是分布式的Sentinel
+	Indexer index_service.IIndexer //索引。可能是本地的Indexer，也可能是分布式的Sentinel
 	Request *demo.SearchRequest    //搜索请求
 	Videos  []*demo.BiliVideo      //搜索结果
 }
