@@ -30,8 +30,8 @@ var (
 
 // ServiceHub的构造函数，单例模式
 func GetServiceHub(etcdServers []string, heartbeatFrequency int64) *ServiceHub {
-	hubOnce.Do(func() {
-		if serviceHub == nil {
+	if serviceHub == nil {
+		hubOnce.Do(func() {
 			if client, err := etcdv3.New(
 				etcdv3.Config{
 					Endpoints:   etcdServers,
@@ -46,8 +46,8 @@ func GetServiceHub(etcdServers []string, heartbeatFrequency int64) *ServiceHub {
 					loadBalancer:       &RoundRobin{},
 				}
 			}
-		}
-	})
+		})
+	}
 	return serviceHub
 }
 
