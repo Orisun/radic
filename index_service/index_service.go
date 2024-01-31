@@ -37,8 +37,8 @@ func (service *IndexServiceWorker) Init(DocNumEstimate int, dbtype int, DataDir 
 		}
 		selfLocalIp = "127.0.0.1" //TODO 单机模拟分布式时，把selfLocalIp写死为127.0.0.1
 		service.selfAddr = selfLocalIp + ":" + strconv.Itoa(servicePort)
-		var heartBeat int64 = 3 //每隔3秒上报一次心跳
-		hub := GetServiceHub(etcdServers, heartBeat)
+		var heartBeat int64 = 3                      //每隔3秒上报一次心跳
+		hub := GetServiceHub(etcdServers, heartBeat) //单例
 		leaseId, err := hub.Regist(INDEX_SERVICE, service.selfAddr, 0)
 		if err != nil {
 			panic(err)
@@ -54,6 +54,11 @@ func (service *IndexServiceWorker) Init(DocNumEstimate int, dbtype int, DataDir 
 	}
 
 	return nil
+}
+
+// 系统重启时，直接从索引文件里加载数据
+func (service *IndexServiceWorker) LoadFromIndexFile() int {
+	return service.Indexer.LoadFromIndexFile()
 }
 
 // 关闭索引
@@ -73,11 +78,6 @@ func (service *IndexServiceWorker) DeleteDoc(ctx context.Context, docId *DocId) 
 func (service *IndexServiceWorker) AddDoc(ctx context.Context, doc *types.Document) (*AffectedCount, error) {
 	n, err := service.Indexer.AddDoc(*doc)
 	return &AffectedCount{int32(n)}, err
-}
-
-// 系统重启时，直接从索引文件里加载数据
-func (service *IndexServiceWorker) LoadFromIndexFile() int {
-	return service.Indexer.LoadFromIndexFile()
 }
 
 // 检索，返回文档列表

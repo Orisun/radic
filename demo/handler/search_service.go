@@ -69,7 +69,7 @@ func StartWorker(port int) {
 			fmt.Printf("start grpc server on port %d failed: %s\n", port, err)
 		}
 	}(port)
-	// indexer=service.Indexer  //单机索引
+	// indexer = service.Indexer //单机索引
 	indexer = index_service.NewSentinel(etcdServers) //分布式索引
 }
 

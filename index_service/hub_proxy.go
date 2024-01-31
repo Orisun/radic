@@ -20,7 +20,7 @@ type IServiceHub interface {
 
 // 代理模式。对ServiceHub做一层代理，想访问endpoints时需要通过代理，代理提供了2个功能：缓存和限流保护
 type HubProxy struct {
-	hub           *ServiceHub
+	*ServiceHub
 	endpointCache sync.Map //维护每一个service下的所有servers
 	limiter       *rate.Limiter
 	loadBalancer  LoadBalancer
@@ -35,49 +35,29 @@ var (
 //
 // qps一秒钟最多允许请求多少次
 func GetServiceHubProxy(etcdServers []string, heartbeatFrequency int64, qps int) *HubProxy {
-	proxyOnce.Do(func() {
-		if proxy == nil {
-			if client, err := etcdv3.New(
-				etcdv3.Config{
-					Endpoints:   etcdServers,
-					DialTimeout: 3 * time.Second,
-				},
-			); err != nil {
-				util.Log.Fatalf("连接不上etcd服务器: %v", err) //发生log.Fatal时go进程会直接退出
-			} else {
-				serviceHub = &ServiceHub{
-					client:             client,
-					heartbeatFrequency: heartbeatFrequency, //租约的有效期
-				}
+	if proxy == nil {
+		proxyOnce.Do(func() {
+			serviceHub := GetServiceHub(etcdServers, heartbeatFrequency)
+			if serviceHub != nil {
 				proxy = &HubProxy{
-					hub:           serviceHub,
+					ServiceHub:    serviceHub,
 					endpointCache: sync.Map{},
 					limiter:       rate.NewLimiter(rate.Every(time.Duration(1e9/qps)*time.Nanosecond), qps), //每隔1E9/qps纳秒产生一个令牌，即一秒钟之内产生qps个令牌。令牌桶的容量为qps
 					loadBalancer:  &RandomSelect{},
 				}
 			}
-		}
-	})
+		})
+	}
 	return proxy
 }
 
-// 注册服务
-func (proxy *HubProxy) Regist(service string, endpoint string, leaseID etcdv3.LeaseID) (etcdv3.LeaseID, error) {
-	return proxy.hub.Regist(service, endpoint, leaseID)
-}
-
-// 注销服务
-func (proxy *HubProxy) UnRegist(service string, endpoint string) error {
-	return proxy.hub.UnRegist(service, endpoint)
-}
-
 func (proxy *HubProxy) watchEndpointsOfService(service string) {
-	if _, exists := proxy.hub.watched.LoadOrStore(service, true); exists {
+	if _, exists := proxy.ServiceHub.watched.LoadOrStore(service, true); exists {
 		return //监听过了，不用重复监听
 	}
 	ctx := context.Background()
 	prefix := strings.TrimRight(SERVICE_ROOT_PATH, "/") + "/" + service + "/"
-	ch := proxy.hub.client.Watch(ctx, prefix, etcdv3.WithPrefix()) //根据前缀监听，每一个修改都会放入管道ch
+	ch := proxy.ServiceHub.client.Watch(ctx, prefix, etcdv3.WithPrefix()) //根据前缀监听，每一个修改都会放入管道ch
 	util.Log.Printf("监听服务%s的节点变化", service)
 	go func() {
 		for response := range ch { //遍历管道。这是个死循环，除非关闭管道
@@ -86,7 +66,7 @@ func (proxy *HubProxy) watchEndpointsOfService(service string) {
 				if len(path) > 2 {
 					service := path[len(path)-2]
 					// 跟etcd进行一次全量同步
-					endpoints := proxy.hub.GetServiceEndpoints(service)
+					endpoints := proxy.ServiceHub.GetServiceEndpoints(service)
 					if len(endpoints) > 0 {
 						proxy.endpointCache.Store(service, endpoints) //查询etcd的结果放入本地缓存
 					} else {
@@ -116,14 +96,10 @@ func (proxy *HubProxy) GetServiceEndpoints(service string) []string {
 	if endpoints, exists := proxy.endpointCache.Load(service); exists {
 		return endpoints.([]string)
 	} else {
-		endpoints := proxy.hub.GetServiceEndpoints(service)
+		endpoints := proxy.ServiceHub.GetServiceEndpoints(service)
 		if len(endpoints) > 0 {
 			proxy.endpointCache.Store(service, endpoints) //查询etcd的结果放入本地缓存
 		}
 		return endpoints
 	}
-}
-
-func (proxy *HubProxy) GetServiceEndpoint(service string) string {
-	return proxy.loadBalancer.Take(proxy.GetServiceEndpoints(service))
 }

@@ -28,13 +28,13 @@ func GetDB1() *gorm.DB {
 	return single
 }
 
-func init() { //init()只会执行一次，所以可以实现单例。但使用init()通常要小心代码的各种依赖关系，关心代码的执行顺序
-	single, _ = gorm.Open(mysql.Open(""))
-}
+// func init() { //init()只会执行一次，所以可以实现单例。但使用init()通常要小心代码的各种依赖关系，关心代码的执行顺序
+// 	single, _ = gorm.Open(mysql.Open(""))
+// }
 
-func GetDB2() *gorm.DB {
-	return single
-}
+// func GetDB2() *gorm.DB {
+// 	return single
+// }
 
 func GetDB3() *gorm.DB {
 	if single == nil { //先判断是否为nil，避免无谓的once.Do
