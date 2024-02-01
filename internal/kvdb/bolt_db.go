@@ -7,7 +7,7 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-var NoDataErr = errors.New("no data")
+var ErrNoData = errors.New("no data")
 
 // Bolt bolt store struct
 type Bolt struct {
@@ -91,7 +91,7 @@ func (s *Bolt) Get(k []byte) ([]byte, error) {
 		return nil
 	})
 	if len(ival) == 0 {
-		return nil, NoDataErr
+		return nil, ErrNoData
 	}
 	return ival, err
 }

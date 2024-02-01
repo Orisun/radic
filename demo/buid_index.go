@@ -101,10 +101,3 @@ func AddVideo2Index(video *BiliVideo, indexer *index_service.Indexer) {
 
 	indexer.AddDoc(doc)
 }
-
-// 从索引上删除一条视频信息
-//
-// 实时更新索引时可调该函数
-func DeleteVideo(BVID string, indexer *index_service.Indexer) {
-	indexer.DeleteDoc(BVID)
-}

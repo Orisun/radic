@@ -52,12 +52,12 @@ func GetServiceHubProxy(etcdServers []string, heartbeatFrequency int64, qps int)
 }
 
 func (proxy *HubProxy) watchEndpointsOfService(service string) {
-	if _, exists := proxy.ServiceHub.watched.LoadOrStore(service, true); exists {
+	if _, exists := proxy.watched.LoadOrStore(service, true); exists {
 		return //监听过了，不用重复监听
 	}
 	ctx := context.Background()
 	prefix := strings.TrimRight(SERVICE_ROOT_PATH, "/") + "/" + service + "/"
-	ch := proxy.ServiceHub.client.Watch(ctx, prefix, etcdv3.WithPrefix()) //根据前缀监听，每一个修改都会放入管道ch
+	ch := proxy.client.Watch(ctx, prefix, etcdv3.WithPrefix()) //根据前缀监听，每一个修改都会放入管道ch
 	util.Log.Printf("监听服务%s的节点变化", service)
 	go func() {
 		for response := range ch { //遍历管道。这是个死循环，除非关闭管道
@@ -66,7 +66,7 @@ func (proxy *HubProxy) watchEndpointsOfService(service string) {
 				if len(path) > 2 {
 					service := path[len(path)-2]
 					// 跟etcd进行一次全量同步
-					endpoints := proxy.ServiceHub.GetServiceEndpoints(service)
+					endpoints := proxy.GetServiceEndpoints(service)
 					if len(endpoints) > 0 {
 						proxy.endpointCache.Store(service, endpoints) //查询etcd的结果放入本地缓存
 					} else {
@@ -96,7 +96,7 @@ func (proxy *HubProxy) GetServiceEndpoints(service string) []string {
 	if endpoints, exists := proxy.endpointCache.Load(service); exists {
 		return endpoints.([]string)
 	} else {
-		endpoints := proxy.ServiceHub.GetServiceEndpoints(service)
+		endpoints := proxy.GetServiceEndpoints(service)
 		if len(endpoints) > 0 {
 			proxy.endpointCache.Store(service, endpoints) //查询etcd的结果放入本地缓存
 		}
