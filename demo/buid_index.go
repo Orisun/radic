@@ -11,11 +11,15 @@ import (
 
 	"github.com/Orisun/radic/v2/index_service"
 	"github.com/Orisun/radic/v2/types"
+	"github.com/Orisun/radic/v2/util"
 	proto "github.com/gogo/protobuf/proto"
+	farmhash "github.com/leemcloughlin/gofarmhash"
 )
 
-// 把CSV文件中的视频信息全部写入索引
-func BuildIndexFromFile(csvFile string, indexer *index_service.Indexer) {
+// 把CSV文件中的视频信息全部写入索引。
+//
+// totalWorkers: 分布式环境中一共有几台index worker，workerIndex本机是第几台worker(从0开始编号)。单机模式下把totalWorkers置0即可
+func BuildIndexFromFile(csvFile string, indexer index_service.IIndexer, totalWorkers, workerIndex int) {
 	file, err := os.Open(csvFile)
 	if err != nil {
 		log.Printf("open file %s failed: %s", csvFile, err)
@@ -34,15 +38,17 @@ func BuildIndexFromFile(csvFile string, indexer *index_service.Indexer) {
 			}
 			break
 		}
-		progress++
-		if progress%100 == 0 { //输出构建索引的进度
-			log.Printf("progress=%d\n", progress)
-		}
+
 		if len(record) < 10 { //避免数组越界，发生panic
 			continue
 		}
+		docId := strings.TrimPrefix(record[0], "https://www.bilibili.com/video/")
+		//只用一部分的视频数据
+		if totalWorkers > 0 && int(farmhash.Hash32WithSeed([]byte(docId), 0))%totalWorkers != workerIndex {
+			continue
+		}
 		video := &BiliVideo{
-			Id:     strings.TrimPrefix(record[0], "https://www.bilibili.com/video/"),
+			Id:     docId,
 			Title:  record[1],
 			Author: record[3],
 		}
@@ -74,13 +80,18 @@ func BuildIndexFromFile(csvFile string, indexer *index_service.Indexer) {
 			}
 		}
 		AddVideo2Index(video, indexer) //构建好BiliVideo实体，写入索引
+		progress++
+		// if progress%100 == 0 { //输出构建索引的进度
+		// 	log.Printf("progress=%d\n", progress)
+		// }
 	}
+	util.Log.Printf("add %d documents to index totally", progress)
 }
 
 // 把一条视频信息写入索引（可能是create，也可能是update）
 //
 // 实时更新索引时可调该函数
-func AddVideo2Index(video *BiliVideo, indexer *index_service.Indexer) {
+func AddVideo2Index(video *BiliVideo, indexer index_service.IIndexer) {
 	doc := types.Document{Id: video.Id}
 	bs, err := proto.Marshal(video)
 	if err == nil {

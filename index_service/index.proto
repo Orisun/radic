@@ -24,10 +24,14 @@ message SearchResult {
     repeated types.Document Results = 1;
 }
 
+message CountRequest {
+}
+
 service IndexService {
     rpc DeleteDoc(DocId) returns (AffectedCount);
     rpc AddDoc(types.Document) returns (AffectedCount);
     rpc Search(SearchRequest) returns (SearchResult);
+    rpc Count(CountRequest) returns (AffectedCount);
 }
 
 // protoc -I=D:/go_project/radic/types --gogofaster_opt=Mdoc.proto=github.com/Orisun/radic/v2/types --gogofaster_opt=Mterm_query.proto=github.com/Orisun/radic/v2/types --gogofaster_out=plugins=grpc:./index_service --proto_path=./index_service index.proto

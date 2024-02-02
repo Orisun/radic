@@ -96,12 +96,12 @@ func (searcher *VideoSearcher) Search(searchContext *common.VideoSearchContext) 
 }
 
 // 子类
-type AllVedioSearcher struct {
+type AllVideoSearcher struct {
 	VideoSearcher
 }
 
-func NewAllVedioSearcher() *AllVedioSearcher {
-	searcher := new(AllVedioSearcher)
+func NewAllVideoSearcher() *AllVideoSearcher {
+	searcher := new(AllVideoSearcher)
 	searcher.WithRecaller(recaller.KeywordRecaller{})
 	searcher.WithFilter(filter.ViewFilter{})
 	return searcher
@@ -112,7 +112,7 @@ type UpVideoSearcher struct {
 	VideoSearcher
 }
 
-func NewUpVedioSearcher() *UpVideoSearcher {
+func NewUpVideoSearcher() *UpVideoSearcher {
 	searcher := new(UpVideoSearcher)
 	searcher.WithRecaller(recaller.KeywordAuthorRecaller{})
 	searcher.WithFilter(filter.ViewFilter{})

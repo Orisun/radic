@@ -14,6 +14,7 @@ const (
 	INDEX_SERVICE = "index_service"
 )
 
+// IndexWorker，是一个grpc server
 type IndexServiceWorker struct {
 	Indexer *Indexer // 把正排和倒排索引放到一起
 	//跟服务注册相关的配置
@@ -56,10 +57,10 @@ func (service *IndexServiceWorker) Init(DocNumEstimate int, dbtype int, DataDir 
 	return nil
 }
 
-// 系统重启时，直接从索引文件里加载数据
-func (service *IndexServiceWorker) LoadFromIndexFile() int {
-	return service.Indexer.LoadFromIndexFile()
-}
+// // 系统重启时，直接从索引文件里加载数据
+// func (service *IndexServiceWorker) LoadFromIndexFile() int {
+// 	return service.Indexer.LoadFromIndexFile()
+// }
 
 // 关闭索引
 func (service *IndexServiceWorker) Close() error {
@@ -84,4 +85,9 @@ func (service *IndexServiceWorker) AddDoc(ctx context.Context, doc *types.Docume
 func (service *IndexServiceWorker) Search(ctx context.Context, request *SearchRequest) (*SearchResult, error) {
 	result := service.Indexer.Search(request.Query, request.OnFlag, request.OffFlag, request.OrFlags)
 	return &SearchResult{Results: result}, nil
+}
+
+// 索引里有几个文档
+func (service *IndexServiceWorker) Count(ctx context.Context, request *CountRequest) (*AffectedCount, error) {
+	return &AffectedCount{int32(service.Indexer.Count())}, nil
 }

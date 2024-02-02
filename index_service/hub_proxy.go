@@ -16,6 +16,7 @@ type IServiceHub interface {
 	UnRegist(service string, endpoint string) error                                         // 注销服务
 	GetServiceEndpoints(service string) []string                                            //服务发现
 	GetServiceEndpoint(service string) string                                               //选择服务的一台endpoint
+	Close()                                                                                 //关闭etcd client connection
 }
 
 // 代理模式。对ServiceHub做一层代理，想访问endpoints时需要通过代理，代理提供了2个功能：缓存和限流保护
@@ -23,7 +24,6 @@ type HubProxy struct {
 	*ServiceHub
 	endpointCache sync.Map //维护每一个service下的所有servers
 	limiter       *rate.Limiter
-	loadBalancer  LoadBalancer
 }
 
 var (
@@ -43,7 +43,6 @@ func GetServiceHubProxy(etcdServers []string, heartbeatFrequency int64, qps int)
 					ServiceHub:    serviceHub,
 					endpointCache: sync.Map{},
 					limiter:       rate.NewLimiter(rate.Every(time.Duration(1e9/qps)*time.Nanosecond), qps), //每隔1E9/qps纳秒产生一个令牌，即一秒钟之内产生qps个令牌。令牌桶的容量为qps
-					loadBalancer:  &RandomSelect{},
 				}
 			}
 		})
@@ -52,21 +51,22 @@ func GetServiceHubProxy(etcdServers []string, heartbeatFrequency int64, qps int)
 }
 
 func (proxy *HubProxy) watchEndpointsOfService(service string) {
-	if _, exists := proxy.watched.LoadOrStore(service, true); exists {
+	if _, exists := proxy.watched.LoadOrStore(service, true); exists { //watched是从父类继承过来的
 		return //监听过了，不用重复监听
 	}
 	ctx := context.Background()
 	prefix := strings.TrimRight(SERVICE_ROOT_PATH, "/") + "/" + service + "/"
-	ch := proxy.client.Watch(ctx, prefix, etcdv3.WithPrefix()) //根据前缀监听，每一个修改都会放入管道ch
+	ch := proxy.client.Watch(ctx, prefix, etcdv3.WithPrefix()) //根据前缀监听，每一个修改都会放入管道ch。client是从父类继承过来的
 	util.Log.Printf("监听服务%s的节点变化", service)
 	go func() {
 		for response := range ch { //遍历管道。这是个死循环，除非关闭管道
 			for _, event := range response.Events { //每次从ch里取出来的是事件的集合
+				util.Log.Printf("etcd event type %s", event.Type) //PUT或DELETE
 				path := strings.Split(string(event.Kv.Key), "/")
 				if len(path) > 2 {
 					service := path[len(path)-2]
 					// 跟etcd进行一次全量同步
-					endpoints := proxy.GetServiceEndpoints(service)
+					endpoints := proxy.ServiceHub.GetServiceEndpoints(service) //显式调用父类的GetServiceEndpoints()
 					if len(endpoints) > 0 {
 						proxy.endpointCache.Store(service, endpoints) //查询etcd的结果放入本地缓存
 					} else {
@@ -96,7 +96,7 @@ func (proxy *HubProxy) GetServiceEndpoints(service string) []string {
 	if endpoints, exists := proxy.endpointCache.Load(service); exists {
 		return endpoints.([]string)
 	} else {
-		endpoints := proxy.GetServiceEndpoints(service)
+		endpoints := proxy.ServiceHub.GetServiceEndpoints(service) //显式调用父类的GetServiceEndpoints()
 		if len(endpoints) > 0 {
 			proxy.endpointCache.Store(service, endpoints) //查询etcd的结果放入本地缓存
 		}

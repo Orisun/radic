@@ -31,7 +31,7 @@ func StartService() {
 	server := grpc.NewServer()
 	service := new(index_service.IndexServiceWorker)
 	service.Init(50000, kvdb.BADGER, util.RootPath+"data/local_db/book_badger", nil, 0) //不进行服务注册，client直连server
-	service.LoadFromIndexFile()                                                         //从文件中加载索引数据
+	service.Indexer.LoadFromIndexFile()                                                 //从文件中加载索引数据
 	// 注册服务的具体实现
 	index_service.RegisterIndexServiceServer(server, service)
 	go func() {

@@ -154,3 +154,42 @@ func (sentinel *Sentinel) Search(query *types.TermQuery, onFlag uint64, offFlag 
 	<-receiveFinish //4
 	return docs
 }
+func (sentinel *Sentinel) Count() int {
+	var n int32
+	endpoints := sentinel.hub.GetServiceEndpoints(INDEX_SERVICE)
+	if len(endpoints) == 0 {
+		return 0
+	}
+	wg := sync.WaitGroup{}
+	wg.Add(len(endpoints))
+	for _, endpoint := range endpoints {
+		go func(endpoint string) {
+			defer wg.Done()
+			conn := sentinel.GetGrpcConn(endpoint)
+			if conn != nil {
+				client := NewIndexServiceClient(conn)
+				affected, err := client.Count(context.Background(), new(CountRequest))
+				if err != nil {
+					util.Log.Printf("get doc count from worker %s failed: %s", endpoint, err)
+				} else {
+					if affected.Count > 0 {
+						atomic.AddInt32(&n, affected.Count)
+						util.Log.Printf("worker %s have %d documents", endpoint, affected.Count)
+					}
+				}
+			}
+		}(endpoint)
+	}
+	return int(n)
+}
+
+// 关闭各个grpc client connection，关闭etcd client connection
+func (sentinel *Sentinel) Close() (err error) {
+	sentinel.connPool.Range(func(key, value any) bool {
+		conn := value.(*grpc.ClientConn)
+		err = conn.Close()
+		return true
+	})
+	sentinel.hub.Close()
+	return
+}

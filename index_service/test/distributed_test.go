@@ -32,7 +32,7 @@ func StartWorkers() {
 		server := grpc.NewServer()
 		service := new(index_service.IndexServiceWorker)
 		service.Init(50000, kvdb.BADGER, util.RootPath+"data/local_db/book_badger_"+strconv.Itoa(i), etcdServers, port) //把自己注册到etcd
-		service.LoadFromIndexFile()                                                                                     //从文件中加载索引数据
+		service.Indexer.LoadFromIndexFile()                                                                             //从文件中加载索引数据
 		// 注册服务的具体实现
 		index_service.RegisterIndexServiceServer(server, service)
 		go func(port int) {

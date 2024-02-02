@@ -45,7 +45,7 @@ func (indexer *Indexer) LoadFromIndexFile() int {
 		indexer.reverseIndex.Add(doc)
 		return err
 	})
-	util.Log.Printf("load %d data from forward index", n)
+	util.Log.Printf("load %d data from forward index %s", n, indexer.forwardIndex.GetDbPath())
 	return int(n)
 }
 
@@ -134,4 +134,14 @@ func (indexer *Indexer) Search(query *types.TermQuery, onFlag uint64, offFlag ui
 		}
 	}
 	return result
+}
+
+// 索引里有几个document
+func (indexer *Indexer) Count() int {
+	n := 0
+	indexer.forwardIndex.IterKey(func(k []byte) error {
+		n++
+		return nil
+	})
+	return n
 }

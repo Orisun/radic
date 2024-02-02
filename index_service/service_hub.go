@@ -121,6 +121,12 @@ func (hub *ServiceHub) GetServiceEndpoints(service string) []string {
 	}
 }
 
+// 根据负载均衡策略，从众多endpoint里选择一个
 func (hub *ServiceHub) GetServiceEndpoint(service string) string {
 	return hub.loadBalancer.Take(hub.GetServiceEndpoints(service))
+}
+
+// 关闭etcd client connection
+func (hub *ServiceHub) Close() {
+	hub.client.Close()
 }
