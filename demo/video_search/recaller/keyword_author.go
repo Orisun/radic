@@ -28,7 +28,7 @@ func (KeywordAuthorRecaller) Recall(ctx *common.VideoSearchContext) []*demo.Bili
 			query = query.And(types.NewTermQuery("content", word)) //满足关键词
 		}
 	}
-	v := ctx.Ctx.Value("user_name")
+	v := ctx.Ctx.Value(common.UN("user_name"))
 	if v != nil {
 		if author, ok := v.(string); ok {
 			if len(author) > 0 {

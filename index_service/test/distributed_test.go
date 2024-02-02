@@ -31,10 +31,11 @@ func StartWorkers() {
 
 		server := grpc.NewServer()
 		service := new(index_service.IndexServiceWorker)
-		service.Init(50000, kvdb.BADGER, util.RootPath+"data/local_db/book_badger_"+strconv.Itoa(i), etcdServers, port) //把自己注册到etcd
+		service.Init(50000, kvdb.BADGER, util.RootPath+"data/local_db/book_badger_"+strconv.Itoa(i)) 
 		service.Indexer.LoadFromIndexFile()                                                                             //从文件中加载索引数据
 		// 注册服务的具体实现
 		index_service.RegisterIndexServiceServer(server, service)
+		service.Regist(etcdServers, port)
 		go func(port int) {
 			// 启动服务
 			fmt.Printf("start grpc server on port %d\n", port)

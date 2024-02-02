@@ -13,3 +13,5 @@ type VideoSearchContext struct {
 	Request *demo.SearchRequest    //搜索请求
 	Videos  []*demo.BiliVideo      //搜索结果
 }
+
+type UN string

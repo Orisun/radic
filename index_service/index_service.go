@@ -23,11 +23,13 @@ type IndexServiceWorker struct {
 }
 
 // 初始化索引
-func (service *IndexServiceWorker) Init(DocNumEstimate int, dbtype int, DataDir string, etcdServers []string, servicePort int) error {
+func (service *IndexServiceWorker) Init(DocNumEstimate int, dbtype int, DataDir string) error{
 	service.Indexer = new(Indexer)
-	service.Indexer.Init(DocNumEstimate, dbtype, DataDir)
+	return service.Indexer.Init(DocNumEstimate, dbtype, DataDir)
+}
 
-	// 向注册中心注册自己
+func (service *IndexServiceWorker) Regist( etcdServers []string, servicePort int) error{
+// 向注册中心注册自己
 	if len(etcdServers) > 0 {
 		if servicePort <= 1024 {
 			return fmt.Errorf("invalid listen port %d, should more than 1024", servicePort)
@@ -53,14 +55,8 @@ func (service *IndexServiceWorker) Init(DocNumEstimate int, dbtype int, DataDir 
 			}
 		}()
 	}
-
 	return nil
 }
-
-// // 系统重启时，直接从索引文件里加载数据
-// func (service *IndexServiceWorker) LoadFromIndexFile() int {
-// 	return service.Indexer.LoadFromIndexFile()
-// }
 
 // 关闭索引
 func (service *IndexServiceWorker) Close() error {

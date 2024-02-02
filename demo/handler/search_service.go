@@ -19,8 +19,6 @@ import (
 
 var Indexer index_service.IIndexer
 
-type UN string
-
 func clearnKeywords(words []string) []string {
 	keywords := make([]string, 0, len(words))
 	for _, w := range words {
@@ -117,7 +115,7 @@ func SearchByAuthor(ctx *gin.Context) {
 		return
 	}
 	searchCtx := &common.VideoSearchContext{
-		Ctx:     context.WithValue(context.Background(), UN("user_name"), userName), //把userName放到context里
+		Ctx:     context.WithValue(context.Background(), common.UN("user_name"), userName), //把userName放到context里
 		Request: &request,
 		Indexer: Indexer,
 	}

@@ -25,7 +25,8 @@ func GrpcIndexerInit() {
 
 	server := grpc.NewServer()
 	service = new(index_service.IndexServiceWorker)
-	service.Init(50000, dbType, *dbPath+"_part"+strconv.Itoa(*workerIndex), etcdServers, *port) //把自己注册到etcd
+	//初始化索引
+	service.Init(50000, dbType, *dbPath+"_part"+strconv.Itoa(*workerIndex)) 
 	if *rebuildIndex {
 		util.Log.Printf("totalWorkers=%d, workerIndex=%d", *totalWorkers, *workerIndex)
 		demo.BuildIndexFromFile(csvFile, service.Indexer, *totalWorkers, *workerIndex) //重建索引
@@ -36,6 +37,8 @@ func GrpcIndexerInit() {
 	index_service.RegisterIndexServiceServer(server, service)
 	// 启动服务
 	fmt.Printf("start grpc server on port %d\n", *port)
+	//向注册中心注册自己，并周期性续命
+	service.Regist( etcdServers, *port)
 	err = server.Serve(lis) //Serve会一直阻塞，所以放到一个协程里异步执行
 	if err != nil {
 		service.Close()

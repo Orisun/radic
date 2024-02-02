@@ -45,9 +45,9 @@ func StartGin() {
 		ctx.HTML(http.StatusOK, "up_search.html", classes)
 	})
 
-	engine.POST("/search", handler.Search)
-	// engine.POST("/search", handler.SearchAll)
-	// engine.POST("/up_search", handler.SearchByAuthor)
+	// engine.POST("/search", handler.Search)
+	engine.POST("/search", handler.SearchAll)
+	engine.POST("/up_search", handler.SearchByAuthor)
 	engine.Run("127.0.0.1:" + strconv.Itoa(*port))
 }
 
@@ -63,7 +63,7 @@ func main() {
 	}
 }
 
-// go run ./demo/main -mode=1 -index=true -port=5678 -dbPath=data/local_db/video_bolt
+// go run ./demo/main -mode=1 -index=false -port=5678 -dbPath=data/local_db/video_bolt
 // go run ./demo/main -mode=2 -index=false -port=5600 -dbPath=data/local_db/video_bolt -totalWorkers=2 -workerIndex=0
 // go run ./demo/main -mode=2 -index=false -port=5601 -dbPath=data/local_db/video_bolt -totalWorkers=2 -workerIndex=1
 // go run ./demo/main -mode=3 -index=false -port=5678
