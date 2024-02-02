@@ -12,7 +12,7 @@ import (
 	"github.com/Orisun/radic/v2/util"
 )
 
-// 把正排和倒排索引放到一起
+// 外观Facade模式。把正排和倒排2个子系统封装到了一起
 type Indexer struct {
 	forwardIndex kvdb.IKeyValueDB
 	reverseIndex reverseindex.IReverseIndexer
