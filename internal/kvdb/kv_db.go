@@ -37,7 +37,7 @@ func GetKvDb(dbtype int, path string) (IKeyValueDB, error) { //通过Get函数�
 	info, err := os.Stat(parentPath)
 	if os.IsNotExist(err) { //如果父路径不存在则创建
 		util.Log.Printf("create dir %s", parentPath)
-		os.MkdirAll(parentPath, 0o644) //数字前的0或0o都表示八进制
+		os.MkdirAll(parentPath, os.ModePerm) //数字前的0或0o都表示八进制
 	} else { //父路径存在
 		if info.Mode().IsRegular() { //如果父路径是个普通文件，则把它删掉
 			util.Log.Printf("%s is a regular file, will delete it", parentPath)
