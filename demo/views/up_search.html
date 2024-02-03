@@ -1,0 +1,135 @@
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" type="text/css" href="css/tagsinput.css">
+    <link rel="stylesheet" type="text/css" href="css/multilabel.css">
+    <link rel="stylesheet" type="text/css" href="css/slider.css">
+    <script src="http://code.jquery.com/jquery-latest.js"></script>
+    <script src="js/tagsinput.js"></script>
+    <style>
+        .button {
+            background-color: #FA9862; 
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+        }
+    </style>
+    <title>up搜索后台</title>
+</head>
+
+<body>
+    <div style="text-align: center; display: flex;">
+        <table style="margin: auto; width: 50%;">
+            <tr>
+                <td>关键词*： </td>
+                <td colspan="3">
+                    <input id="keyword" name="keyword" style="display: none;"></input>
+                </td>
+            </tr>
+            <tr>
+                <td>类别： </td>
+                <td colspan="3">
+                    {{range .}}
+                    <label>
+                        <input type="checkbox" value="{{.}}" />
+                        <span>{{.}}</span>
+                    </label>
+                    {{end}}
+                </td>
+            </tr>
+            <tr>
+                <td width="10%">播放量： </td>
+                <td width="50%">
+                    <div class="range">
+                        <div class="range-slider">
+                          <span class="range-selected"></span>
+                        </div>
+                        <div class="range-input">
+                          <input type="range" class="min" min="0" max="100000" value="1000" step="100">
+                          <input type="range" class="max" min="0" max="100000" value="20000" step="100">
+                        </div>
+                      </div>  
+                </td>
+                <td width="20%">
+                    <div class="range-price">      
+                        <input type="number" name="min" id="min" value="1000">-    <input type="number" name="max" id="max" value="20000"> 
+                    </div>
+                </td>
+                <td  style="width: 20%; text-align: right;"><button class="button" onclick="search();">搜索</button></td>
+                <script src="js/slider.js"></script>
+            </tr>
+        </table>
+    </div>
+    <div style="text-align: center;" id="result"></div>
+    <script>
+        function search() {
+            var classes = [];
+            var chked = document.querySelectorAll("[type=checkbox]:checked");
+            for (var i = 0; i < chked.length; i++) {
+                classes.push(chked[i].value);
+            }
+            var keywords = $.trim(document.getElementById('keyword').value);
+            var viewFrom = $.trim(document.getElementById('min').value);
+            var viewTo = $.trim(document.getElementById('max').value);
+            param={
+                'Classes':classes,
+                'Keywords':keywords.split(/[,]/),
+                'ViewFrom':parseInt(viewFrom),
+                'ViewTo':parseInt(viewTo),
+            }
+            $.ajax({
+                type: "POST",
+                url: "/up_search",
+                // contentType: "application/json",
+                // dataType: 'json',
+                timeout: 10000, //超时时间
+                beforeSend: function (request) {
+                    $("#result").html("<img src='img/loading.gif' />"); //在后台返回success之前显示loading图标
+                    request.setRequestHeader("UserName", encodeURI("高性能golang"));  //写死user_name，实际中应该从浏览器的LocalStorage里取得用户的登录信息。包含中文时要进行encodeURI编码
+                },
+                data: JSON.stringify(param),
+                success: function (result) {
+                    strResult = `<table style="text-align: center;">`;
+                    strResult += `<tr bgcolor="#FA9862"><th width="5%">编号</th><th width="15%">作者</th><th width="30%">标题</th><th width="10%">播放量</th><th width="30%">关键词</th><th width="15%">发布时间</th>`;
+                    $.each(result, function (index, video) {
+                        strResult += `<tr><td>`;
+                        strResult += index;
+                        strResult += `</td><td>`;
+                        strResult += video.Author;
+                        strResult += `</td><td>`;
+                        strResult += `<a target="_blank" href="https://www.bilibili.com/video/`+video.Id+`">`+video.Title+`</a>`;
+                        strResult += `</td><td>`;
+                        strResult += video.View;
+                        strResult += `</td><td>`;
+                        strResult += video.Keywords.join(',');
+                        strResult += `</td><td>`;
+                        strResult += new Date(video.PostTime * 1000).toISOString().split('T')[0];
+                        strResult += `</td></tr>`;
+                    });
+                    strResult += `</table>`;
+                    $('#result').html(strResult);
+                },
+            }).fail(function (result, result1, result2) {
+                $("#result").html(result.responseText); 
+            });
+        };
+        $(document).ready(function() {
+            $('input[name="keyword"]').tagsinput({
+                trimValue: true,
+                confirmKeys: [13, 44, 32],
+                focusClass: 'my-focus-class'
+            });
+
+            $('.bootstrap-tagsinput input').on('focus', function() {
+                $(this).closest('.bootstrap-tagsinput').addClass('has-focus');
+            }).on('blur', function() {
+                $(this).closest('.bootstrap-tagsinput').removeClass('has-focus');
+            });
+        });
+    </script>
+</body>

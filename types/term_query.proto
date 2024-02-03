@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package types;
+
+import "doc.proto";  //从-I指定的目录下寻找该proto文件
+
+message TermQuery {
+    Keyword Keyword = 1;    //Keyword类型引用自doc.proto
+    repeated TermQuery Must = 2;
+    repeated TermQuery Should = 3;
+}
+
+// protoc -I=D:/go_project/radic/types --gogofaster_out=./types --proto_path=./types term_query.proto
+// 在windows上-I需使用绝对路径

@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package index_service;
+
+import "doc.proto";  //从-I指定的目录下寻找该proto文件
+import "term_query.proto";
+
+message DocId {
+    string DocId = 1;
+}
+
+message AffectedCount {
+    int32 Count = 1;
+}
+
+message SearchRequest {
+    types.TermQuery Query = 1;  //TermQuery类型引用自term_query.proto
+    uint64 OnFlag = 2;
+    uint64 OffFlag = 3;
+    repeated uint64 OrFlags = 4;
+}
+
+message SearchResult {
+    repeated types.Document Results = 1;
+}
+
+message CountRequest {
+}
+
+service IndexService {
+    rpc DeleteDoc(DocId) returns (AffectedCount);
+    rpc AddDoc(types.Document) returns (AffectedCount);
+    rpc Search(SearchRequest) returns (SearchResult);
+    rpc Count(CountRequest) returns (AffectedCount);
+}
+
+// protoc -I=D:/go_project/radic/types --gogofaster_opt=Mdoc.proto=github.com/Orisun/radic/v2/types --gogofaster_opt=Mterm_query.proto=github.com/Orisun/radic/v2/types --gogofaster_out=plugins=grpc:./index_service --proto_path=./index_service index.proto
+// 在windows上-I需使用绝对路径
+// --gogofaster_opt=M指示了.proto里的import转到.go里该怎么写，比如.proto里写import "doc.proto"，转到.go里就应该写 import "github.com/Orisun/radic/v2/types"
+// -I和--gogofaster_opt=M可以有多个
