@@ -56,13 +56,13 @@ var (
 )
 
 func TestSearch(t *testing.T) {
-	indexer := new(index_service.Indexer)
-	if err := indexer.Init(100, dbType, dbPath); err != nil {
+	radic := new(index_service.Indexer)
+	if err := radic.Init(100, dbType, dbPath); err != nil {
 		fmt.Println(err)
 		t.Fail()
 		return
 	}
-	defer indexer.Close()
+	defer radic.Close()
 
 	book1 := Book{
 		ISBN:    "315246546",
@@ -105,9 +105,9 @@ func TestSearch(t *testing.T) {
 		Bytes:       book3.Serialize(),
 	}
 
-	indexer.AddDoc(doc1)
-	indexer.AddDoc(doc2)
-	indexer.AddDoc(doc3)
+	radic.AddDoc(doc1)
+	radic.AddDoc(doc2)
+	radic.AddDoc(doc3)
 
 	q1 := types.NewTermQuery("title", "生命起源")
 	q2 := types.NewTermQuery("content", "文物")
@@ -123,7 +123,7 @@ func TestSearch(t *testing.T) {
 	var onFlag uint64 = 0b10000
 	var offFlag uint64 = 0b01000
 	orFlags := []uint64{uint64(0b00010), uint64(0b00101)}
-	docs := indexer.Search(q8, onFlag, offFlag, orFlags) //检索
+	docs := radic.Search(q8, onFlag, offFlag, orFlags) //检索
 	for _, doc := range docs {
 		book := DeserializeBook(doc.Bytes) //检索的结果是二进流，需要自反序列化
 		if book != nil {
@@ -132,8 +132,8 @@ func TestSearch(t *testing.T) {
 	}
 	fmt.Println(strings.Repeat("-", 50))
 
-	indexer.DeleteDoc(doc2.Id)
-	docs = indexer.Search(q8, onFlag, offFlag, orFlags) //检索
+	radic.DeleteDoc(doc2.Id)
+	docs = radic.Search(q8, onFlag, offFlag, orFlags) //检索
 	for _, doc := range docs {
 		book := DeserializeBook(doc.Bytes) //检索的结果是二进流，需要自反序列化
 		if book != nil {
@@ -142,8 +142,8 @@ func TestSearch(t *testing.T) {
 	}
 	fmt.Println(strings.Repeat("-", 50))
 
-	indexer.AddDoc(doc2)
-	docs = indexer.Search(q8, onFlag, offFlag, orFlags) //检索
+	radic.AddDoc(doc2)
+	docs = radic.Search(q8, onFlag, offFlag, orFlags) //检索
 	for _, doc := range docs {
 		book := DeserializeBook(doc.Bytes) //检索的结果是二进流，需要自反序列化
 		if book != nil {
