@@ -1,4 +1,5 @@
 # radic索引框架
+radic，纯go语言实现的搜索引擎索引框架。目前是v2版本。    
 ## 倒排索引
 
 <img src="img/倒排索引.png" width="700"/>    
