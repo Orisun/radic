@@ -1,7 +1,7 @@
 # radic索引框架
 ## 倒排索引
 
-<img src="img/倒排索引.png" width="500"/>    
+<img src="img/倒排索引.png" width="700"/>    
 
 - 倒排索引的list是有序的，便于多条倒排链快速求交集。    
 - IntId是radic系统内部给doc生成的自增id，用于SkipList的排序。  
@@ -12,7 +12,7 @@
 支持badger和bolt两种数据库存储doc的详情。  
 
 ## 分布式索引
-各索引服务器之间通过grpc通信，通过etcd实现服务注册与发现。  
+doc数量过大，单机容不下时，可以将doc分散存储在多台服务器上。各索引服务器之间通过grpc通信，通过etcd实现服务注册与发现。  
 
 ## 使用方法
 `go get -u github.com/Orisun/radic/v2`
