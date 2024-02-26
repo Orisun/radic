@@ -15,6 +15,14 @@ radic，纯go语言实现的搜索引擎索引框架。目前是v2版本。
 ## 分布式索引
 doc数量过大，单机容不下时，可以将doc分散存储在多台服务器上。各索引服务器之间通过grpc通信，通过etcd实现服务注册与发现。  
 
+<img src="img/分布式索引架构.png" width="500"/>    
+
+- 由多个Group垂直切分整个倒排索引，每个Group内有多台worker做冗余备份
+- Group内部使用最小并发度算法做负载均衡
+- worker(Group)之间通过etcd感知彼此的存在，并使用grpc通信
+- request先打到etcd，etcd对各个Group做负载均衡
+- proxy缓存etcd的结果，并对etcd进行限流保护
+
 ## 使用方法
 `go get -u github.com/Orisun/radic/v2`
 假设业务doc为Book
