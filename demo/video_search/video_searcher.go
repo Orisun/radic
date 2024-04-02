@@ -48,7 +48,7 @@ func (searcher *VideoSearcher) Recall(searchContext *common.VideoSearchContext) 
 			defer wg.Done()
 			rule := reflect.TypeOf(recaller).Name()
 			result := recaller.Recall(searchContext)
-			util.Log.Printf("recall %d talents by %s", len(result), rule)
+			util.Log.Printf("recall %d docs by %s", len(result), rule)
 			for _, video := range result {
 				collection <- video
 			}

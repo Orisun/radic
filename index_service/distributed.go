@@ -180,6 +180,7 @@ func (sentinel *Sentinel) Count() int {
 			}
 		}(endpoint)
 	}
+	wg.Wait()
 	return int(n)
 }
 
