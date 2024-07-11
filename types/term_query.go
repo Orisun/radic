@@ -47,7 +47,7 @@ func (q *TermQuery) Or(querys ...*TermQuery) *TermQuery {
 	return &TermQuery{Should: array} //TermQuery的一级成员里只有Should非空，Must和Keyword都为空
 }
 
-// print函数会自动调用变量的ToString()方法
+// print函数会自动调用变量的String()方法
 func (q TermQuery) ToString() string {
 	if q.Keyword != nil {
 		return q.Keyword.ToString()

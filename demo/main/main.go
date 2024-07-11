@@ -63,7 +63,8 @@ func main() {
 	}
 }
 
-// go run ./demo/main -mode=1 -index=true -port=5678 -dbPath=data/local_db/video_bolt
-// go run ./demo/main -mode=2 -index=true -port=5600 -dbPath=data/local_db/video_bolt -totalWorkers=2 -workerIndex=0
-// go run ./demo/main -mode=2 -index=true -port=5601 -dbPath=data/local_db/video_bolt -totalWorkers=2 -workerIndex=1
-// go run ./demo/main -mode=3 -index=true -port=5678
+// go run ./demo/main -mode=1 -index=false -port=5678 -dbPath=data/local_db/video_bolt
+// go run ./demo/main -mode=2 -index=false -port=5600 -dbPath=data/local_db/video_bolt -totalWorkers=2 -workerIndex=0
+// go run ./demo/main -mode=2 -index=false -port=5601 -dbPath=data/local_db/video_bolt -totalWorkers=2 -workerIndex=1
+// 查看有没有注册上  etcdctl get --prefix "/radic"
+// go run ./demo/main -mode=3 -index=false -port=5678
