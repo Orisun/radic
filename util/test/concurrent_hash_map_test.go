@@ -102,8 +102,8 @@ func TestConcurrentHashMapIterator(t *testing.T) {
 /*
 goos: windows
 goarch: amd64
-pkg: gift/util/test
+pkg: github.com/Orisun/radic/v2/util/test
 cpu: 11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz
-BenchmarkConMap-8              4        1174202475 ns/op        632463264 B/op  18081067 allocs/op
-BenchmarkSynMap-8              1        3449703900 ns/op        433304672 B/op  12091765 allocs/op
+BenchmarkConMap-8              2        2002626250 ns/op        626950952 B/op   6099462 allocs/op
+BenchmarkSynMap-8              1        7216359500 ns/op        596503800 B/op  18114665 allocs/op
 */
