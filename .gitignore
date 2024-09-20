@@ -3,3 +3,6 @@
 .vscode
 data
 default.etcd
+*.exe
+*.log
+*.out
