@@ -29,6 +29,7 @@ func (indexer SkipListReverseIndex) getLock(key string) *sync.RWMutex {
 	return &indexer.locks[n%len(indexer.locks)]
 }
 
+// 倒排链上的每个元素包含2部分：SkipListKey（即Document.IntId）和SkipListValue（即Document.Id和Document.BitsFeature）
 type SkipListValue struct {
 	Id          string
 	BitsFeature uint64
@@ -39,7 +40,7 @@ func (indexer *SkipListReverseIndex) Add(doc types.Document) {
 	for _, keyword := range doc.Keywords {
 		key := keyword.ToString()
 		lock := indexer.getLock(key)
-		lock.Lock()
+		lock.Lock() //准备修改倒排链，加写锁
 		sklValue := SkipListValue{doc.Id, doc.BitsFeature}
 		if value, exists := indexer.table.Get(key); exists {
 			list := value.(*skiplist.SkipList)
@@ -58,7 +59,7 @@ func (indexer *SkipListReverseIndex) Add(doc types.Document) {
 func (indexer *SkipListReverseIndex) Delete(IntId uint64, keyword *types.Keyword) {
 	key := keyword.ToString()
 	lock := indexer.getLock(key)
-	lock.Lock()
+	lock.Lock() //准备修改倒排链，加写锁
 	if value, exists := indexer.table.Get(key); exists {
 		list := value.(*skiplist.SkipList)
 		list.Remove(IntId)
@@ -88,7 +89,7 @@ func IntersectionOfSkipList(lists ...*skiplist.SkipList) *skiplist.SkipList {
 		for i, node := range currNodes {
 			if node.Key().(uint64) > maxValue {
 				maxValue = node.Key().(uint64)
-				maxList = map[int]struct{}{i: {}} //可以用一对大括号表示空结构体实例
+				maxList = map[int]struct{}{i: {}} //清空之前的map，新map里面放入一个元素i。可以用一对大括号表示空结构体实例
 			} else if node.Key().(uint64) == maxValue {
 				maxList[i] = struct{}{}
 			}
@@ -123,17 +124,13 @@ func UnionsetOfSkipList(lists ...*skiplist.SkipList) *skiplist.SkipList {
 		return lists[0]
 	}
 	result := skiplist.New(skiplist.Uint64)
-	keySet := make(map[any]struct{}, 1000)
 	for _, list := range lists {
 		if list == nil {
 			continue
 		}
 		node := list.Front()
 		for node != nil {
-			if _, exists := keySet[node.Key()]; !exists {
-				result.Set(node.Key(), node.Value)
-				keySet[node.Key()] = struct{}{}
-			}
+			result.Set(node.Key(), node.Value)
 			node = node.Next()
 		}
 	}
@@ -163,6 +160,9 @@ func (indexer SkipListReverseIndex) FilterByBits(bits uint64, onFlag uint64, off
 func (indexer SkipListReverseIndex) search(q *types.TermQuery, onFlag uint64, offFlag uint64, orFlags []uint64) *skiplist.SkipList {
 	if q.Keyword != nil {
 		Keyword := q.Keyword.ToString()
+		lock := indexer.getLock(Keyword)
+		lock.RLock() //准备遍历倒排链，加读锁
+		defer lock.RUnlock()
 		if value, exists := indexer.table.Get(Keyword); exists {
 			result := skiplist.New(skiplist.Uint64)
 			list := value.(*skiplist.SkipList)

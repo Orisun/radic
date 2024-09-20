@@ -5,6 +5,7 @@ package types;
 import "doc.proto";  //从-I指定的目录下寻找该proto文件
 
 message TermQuery {
+    // 这3个成员变量只有1个不为nil
     Keyword Keyword = 1;    //Keyword类型引用自doc.proto
     repeated TermQuery Must = 2;
     repeated TermQuery Should = 3;

@@ -15,6 +15,6 @@ func init() {
 
 // 获取当前函数所在go代码的路径
 func GetCurrentPath() string {
-	_, filename, _, _ := runtime.Caller(1) //1表示当前函数，2表示调用本函数的函数，3...依次类推
+	_, filename, _, _ := runtime.Caller(1) //0表示当前函数，1表示调用本函数的函数，2...依次类推
 	return path.Dir(filename)
 }
