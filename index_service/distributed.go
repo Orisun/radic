@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	types "github.com/Orisun/radic/v2/types"
 	"github.com/Orisun/radic/v2/util"
@@ -31,7 +30,7 @@ func (sentinel *Sentinel) GetGrpcConn(endpoint string) *grpc.ClientConn {
 	if v, exists := sentinel.connPool.Load(endpoint); exists {
 		conn := v.(*grpc.ClientConn)
 		//如果连接状态不可用，则从连接缓存中删除
-		if conn.GetState() == connectivity.TransientFailure || conn.GetState() == connectivity.Shutdown {
+		if !(conn.GetState() == connectivity.Connecting || conn.GetState() == connectivity.Ready) {
 			util.Log.Printf("connection status to endpoint %s is %s", endpoint, conn.GetState())
 			conn.Close()
 			sentinel.connPool.Delete(endpoint)
@@ -40,14 +39,13 @@ func (sentinel *Sentinel) GetGrpcConn(endpoint string) *grpc.ClientConn {
 		}
 	}
 	//连接到服务端
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond) //控制连接超时
-	defer cancel()
-	conn, err := grpc.DialContext(
-		ctx,
+	// ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond) //控制连接超时
+	// defer cancel()
+	conn, err := grpc.NewClient(
 		endpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()), //Credential即使为空，也必须设置
 		//grpc.Dial是异步连接的，连接状态为正在连接。但如果你设置了 grpc.WithBlock 选项，就会阻塞等待（等待握手成功）。另外你需要注意，当未设置 grpc.WithBlock 时，ctx 超时控制对其无任何效果。
-		grpc.WithBlock(),
+		// grpc.WithBlock(),
 	)
 	if err != nil {
 		util.Log.Printf("dial %s failed: %s", endpoint, err)
@@ -58,7 +56,7 @@ func (sentinel *Sentinel) GetGrpcConn(endpoint string) *grpc.ClientConn {
 	return conn
 }
 
-// 向集群中添加文档(如果已存在，会先删除)
+// 向集群中添加文档(如果已存在，会先删除)。选一台Index Worker，把Doc加上去即可
 func (sentinel *Sentinel) AddDoc(doc types.Document) (int, error) {
 	endpoint := sentinel.hub.GetServiceEndpoint(INDEX_SERVICE) // 根据负载均衡策略，选择一台index worker，把doc添加到它上面去
 	if len(endpoint) == 0 {
@@ -77,7 +75,7 @@ func (sentinel *Sentinel) AddDoc(doc types.Document) (int, error) {
 	return int(affected.Count), nil
 }
 
-// 从集群上删除docId，返回成功删除的doc数（正常情况下不会超过1）
+// 从集群上删除docId，返回成功删除的doc数（正常情况下不会超过1）。向所有Index Worker发送DeleteDoc请求
 func (sentinel *Sentinel) DeleteDoc(docId string) int {
 	endpoints := sentinel.hub.GetServiceEndpoints(INDEX_SERVICE)
 	if len(endpoints) == 0 {
@@ -92,7 +90,7 @@ func (sentinel *Sentinel) DeleteDoc(docId string) int {
 			conn := sentinel.GetGrpcConn(endpoint)
 			if conn != nil {
 				client := NewIndexServiceClient(conn)
-				affected, err := client.DeleteDoc(context.Background(), &DocId{docId})
+				affected, err := client.DeleteDoc(context.Background(), &DocId{DocId: docId})
 				if err != nil {
 					util.Log.Printf("delete doc %s from worker %s failed: %s", docId, endpoint, err)
 				} else {
@@ -108,6 +106,7 @@ func (sentinel *Sentinel) DeleteDoc(docId string) int {
 	return int(atomic.LoadInt32(&n))
 }
 
+// 向所有Index Worker发送Search请求，最后把结果进行合并
 func (sentinel *Sentinel) Search(query *types.TermQuery, onFlag uint64, offFlag uint64, orFlags []uint64) []*types.Document {
 	endpoints := sentinel.hub.GetServiceEndpoints(INDEX_SERVICE)
 	if len(endpoints) == 0 {
@@ -130,7 +129,7 @@ func (sentinel *Sentinel) Search(query *types.TermQuery, onFlag uint64, offFlag 
 					if len(result.Results) > 0 {
 						util.Log.Printf("search %d doc from worker %s", len(result.Results), endpoint)
 						for _, doc := range result.Results {
-							resultCh <- doc
+							resultCh <- doc //resultCh容量有限，若只写不读，resultCh写满后会永远阻塞，协程无法退出
 						}
 					}
 				}
@@ -141,7 +140,7 @@ func (sentinel *Sentinel) Search(query *types.TermQuery, onFlag uint64, offFlag 
 	receiveFinish := make(chan struct{})
 	go func() { //为什么要放到一个子协程里？因为里面有个无限for循环，只有“//1”执行了该for循环才能退出
 		for {
-			doc, ok := <-resultCh
+			doc, ok := <-resultCh // 在写resultCh的同时开启读协程
 			if !ok {
 				break //2
 			}
@@ -154,6 +153,8 @@ func (sentinel *Sentinel) Search(query *types.TermQuery, onFlag uint64, offFlag 
 	<-receiveFinish //4
 	return docs
 }
+
+// 向所有Index Worker发送Count请求，最后把计数进行累加
 func (sentinel *Sentinel) Count() int {
 	var n int32
 	endpoints := sentinel.hub.GetServiceEndpoints(INDEX_SERVICE)

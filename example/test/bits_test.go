@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/Orisun/radic/v2/demo"
+	demo "github.com/Orisun/radic/v2/example"
 )
 
 func TestGetClassBits(t *testing.T) {

@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/Orisun/radic/v2/index_service"
-	"github.com/Orisun/radic/v2/internal/kvdb"
 	"github.com/Orisun/radic/v2/types"
 	"github.com/Orisun/radic/v2/util"
 )
@@ -51,7 +50,7 @@ func DeserializeBook(v []byte) *Book {
 var (
 	// dbType=kvdb.BOLT
 	// dbPath=util.RootPath+"data/local_db/book_bolt"
-	dbType = kvdb.BADGER
+	dbType = types.BADGER
 	dbPath = util.RootPath + "data/local_db/book_badger"
 )
 

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Orisun/radic/v2/demo"
+	demo "github.com/Orisun/radic/v2/example"
 	"github.com/bytedance/sonic"
 )
 

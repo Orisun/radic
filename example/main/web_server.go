@@ -5,8 +5,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/Orisun/radic/v2/demo"
-	"github.com/Orisun/radic/v2/demo/handler"
+	demo "github.com/Orisun/radic/v2/example"
+	"github.com/Orisun/radic/v2/example/handler"
 	"github.com/Orisun/radic/v2/index_service"
 )
 

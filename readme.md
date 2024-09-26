@@ -21,7 +21,10 @@ doc数量过大，单机容不下时，可以将doc分散存储在多台服务�
 - Group内部使用最小并发度算法做负载均衡
 - worker(Group)之间通过etcd感知彼此的存在，并使用grpc通信
 - request先打到etcd，etcd对各个Group做负载均衡
-- proxy缓存etcd的结果，并对etcd进行限流保护
+- proxy缓存etcd的结果，并对etcd进行限流保护  
+
+## radic搜索引擎架构
+<img src="img/radic搜索引擎架构.png" width="500"/>   
 
 ## 使用方法
 `go get -u github.com/Orisun/radic/v2`
@@ -42,7 +45,7 @@ func DeserializeBook(v []byte) *Book {
 ```
 初始化radic  
 ```go
-dbType := kvdb.BADGER   //或kvdb.BOLT
+dbType := types.BADGER   //或types.BOLT
 dbPath := "data/local_db/book_badger"   //正排索引的存储路径
 docNum := 10000    //预估索引里将存储多少文档
 radic := new(index_service.Indexer)

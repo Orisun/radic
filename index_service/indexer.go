@@ -80,14 +80,12 @@ func (indexer *Indexer) AddDoc(doc types.Document) (int, error) {
 
 // 从索引上删除文档
 func (indexer *Indexer) DeleteDoc(docId string) int {
-	n := 0
 	forwardKey := []byte(docId)
 	//先读正排索引，得到IntId和Keywords
 	docBs, err := indexer.forwardIndex.Get(forwardKey)
 	if err == nil {
 		reader := bytes.NewReader([]byte{})
 		if len(docBs) > 0 {
-			n = 1
 			reader.Reset(docBs)
 			decoder := gob.NewDecoder(reader)
 			var doc types.Document
@@ -99,10 +97,14 @@ func (indexer *Indexer) DeleteDoc(docId string) int {
 				}
 			}
 		}
+	} else {
+		return 0
 	}
 	//从正排上删除
-	indexer.forwardIndex.Delete(forwardKey)
-	return n
+	if err := indexer.forwardIndex.Delete(forwardKey); err != nil {
+		return 0
+	}
+	return 1
 }
 
 // 检索，返回文档列表

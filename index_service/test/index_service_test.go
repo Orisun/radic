@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/Orisun/radic/v2/index_service"
-	"github.com/Orisun/radic/v2/internal/kvdb"
 	"github.com/Orisun/radic/v2/types"
 	"github.com/Orisun/radic/v2/util"
 	"google.golang.org/grpc"
@@ -30,8 +29,8 @@ func StartService() {
 
 	server := grpc.NewServer()
 	service := new(index_service.IndexServiceWorker)
-	service.Init(50000, kvdb.BADGER, util.RootPath+"data/local_db/book_badger") //不进行服务注册，client直连server
-	service.Indexer.LoadFromIndexFile()                                                 //从文件中加载索引数据
+	service.Init(50000, types.BADGER, util.RootPath+"data/local_db/book_badger") //不进行服务注册，client直连server
+	service.Indexer.LoadFromIndexFile()                                          //从文件中加载索引数据
 	// 注册服务的具体实现
 	index_service.RegisterIndexServiceServer(server, service)
 	go func() {

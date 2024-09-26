@@ -28,6 +28,7 @@ func BuildIndexFromFile(csvFile string, indexer index_service.IIndexer, totalWor
 	defer file.Close()
 
 	loc, _ := time.LoadLocation("Asia/Shanghai")
+	const layout = "2006/1/2 15:4"
 	reader := csv.NewReader(file) //读取CSV文件
 	progress := 0
 	for {
@@ -53,7 +54,7 @@ func BuildIndexFromFile(csvFile string, indexer index_service.IIndexer, totalWor
 			Author: record[3],
 		}
 		if len(record[2]) > 4 {
-			t, err := time.ParseInLocation("2006/1/2 15:4", record[2], loc)
+			t, err := time.ParseInLocation(layout, record[2], loc)
 			if err != nil {
 				log.Printf("parse time %s failed: %s", record[2], err)
 			} else {

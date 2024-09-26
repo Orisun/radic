@@ -4,14 +4,14 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Orisun/radic/v2/demo"
+	demo "github.com/Orisun/radic/v2/example"
 	"github.com/Orisun/radic/v2/index_service"
-	"github.com/Orisun/radic/v2/internal/kvdb"
+	"github.com/Orisun/radic/v2/types"
 	"github.com/Orisun/radic/v2/util"
 )
 
 var (
-	dbType  = kvdb.BOLT
+	dbType  = types.BOLT
 	dbPath  = util.RootPath + "data/local_db/video_bolt"
 	indexer *index_service.Indexer
 )

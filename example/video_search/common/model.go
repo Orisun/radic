@@ -3,7 +3,7 @@ package common
 import (
 	"context"
 
-	"github.com/Orisun/radic/v2/demo"
+	demo "github.com/Orisun/radic/v2/example"
 	"github.com/Orisun/radic/v2/index_service"
 )
 

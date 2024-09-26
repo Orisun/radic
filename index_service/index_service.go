@@ -23,13 +23,13 @@ type IndexServiceWorker struct {
 }
 
 // 初始化索引
-func (service *IndexServiceWorker) Init(DocNumEstimate int, dbtype int, DataDir string) error{
+func (service *IndexServiceWorker) Init(DocNumEstimate int, dbtype int, DataDir string) error {
 	service.Indexer = new(Indexer)
 	return service.Indexer.Init(DocNumEstimate, dbtype, DataDir)
 }
 
-func (service *IndexServiceWorker) Regist( etcdServers []string, servicePort int) error{
-// 向注册中心注册自己
+func (service *IndexServiceWorker) Regist(etcdServers []string, servicePort int) error {
+	// 向注册中心注册自己
 	if len(etcdServers) > 0 {
 		if servicePort <= 1024 {
 			return fmt.Errorf("invalid listen port %d, should more than 1024", servicePort)
@@ -68,13 +68,13 @@ func (service *IndexServiceWorker) Close() error {
 
 // 从索引上删除文档
 func (service *IndexServiceWorker) DeleteDoc(ctx context.Context, docId *DocId) (*AffectedCount, error) {
-	return &AffectedCount{int32(service.Indexer.DeleteDoc(docId.DocId))}, nil
+	return &AffectedCount{Count: int32(service.Indexer.DeleteDoc(docId.DocId))}, nil
 }
 
 // 向索引中添加文档(如果已存在，会先删除)
 func (service *IndexServiceWorker) AddDoc(ctx context.Context, doc *types.Document) (*AffectedCount, error) {
 	n, err := service.Indexer.AddDoc(*doc)
-	return &AffectedCount{int32(n)}, err
+	return &AffectedCount{Count: int32(n)}, err
 }
 
 // 检索，返回文档列表
@@ -85,5 +85,5 @@ func (service *IndexServiceWorker) Search(ctx context.Context, request *SearchRe
 
 // 索引里有几个文档
 func (service *IndexServiceWorker) Count(ctx context.Context, request *CountRequest) (*AffectedCount, error) {
-	return &AffectedCount{int32(service.Indexer.Count())}, nil
+	return &AffectedCount{Count: int32(service.Indexer.Count())}, nil
 }

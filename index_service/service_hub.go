@@ -18,7 +18,7 @@ const (
 // 服务注册中心
 type ServiceHub struct {
 	client             *etcdv3.Client
-	heartbeatFrequency int64 //server每隔几秒钟不动向中心上报一次心跳（其实就是续一次租约）
+	heartbeatFrequency int64 //server每隔几秒钟不停地向中心上报一次心跳（其实就是续一次租约）
 	watched            sync.Map
 	loadBalancer       LoadBalancer //策略模式。完成同一个任务可以有多种不同的实现方案
 }
@@ -30,24 +30,22 @@ var (
 
 // ServiceHub的构造函数，单例模式
 func GetServiceHub(etcdServers []string, heartbeatFrequency int64) *ServiceHub {
-	if serviceHub == nil {
-		hubOnce.Do(func() {
-			if client, err := etcdv3.New(
-				etcdv3.Config{
-					Endpoints:   etcdServers,
-					DialTimeout: 3 * time.Second,
-				},
-			); err != nil {
-				util.Log.Fatalf("连接不上etcd服务器: %v", err) //发生log.Fatal时go进程会直接退出
-			} else {
-				serviceHub = &ServiceHub{
-					client:             client,
-					heartbeatFrequency: heartbeatFrequency, //租约的有效期
-					loadBalancer:       &RoundRobin{},
-				}
+	hubOnce.Do(func() {
+		if client, err := etcdv3.New(
+			etcdv3.Config{
+				Endpoints:   etcdServers,
+				DialTimeout: 3 * time.Second,
+			},
+		); err != nil {
+			util.Log.Fatalf("连接不上etcd服务器: %v", err) //发生log.Fatal时go进程会直接退出
+		} else {
+			serviceHub = &ServiceHub{
+				client:             client,
+				heartbeatFrequency: heartbeatFrequency, //租约的有效期
+				loadBalancer:       &RoundRobin{},
 			}
-		})
-	}
+		}
+	})
 	return serviceHub
 }
 

@@ -35,18 +35,16 @@ var (
 //
 // qps一秒钟最多允许请求多少次
 func GetServiceHubProxy(etcdServers []string, heartbeatFrequency int64, qps int) *HubProxy {
-	if proxy == nil {
-		proxyOnce.Do(func() {
-			serviceHub := GetServiceHub(etcdServers, heartbeatFrequency)
-			if serviceHub != nil {
-				proxy = &HubProxy{
-					ServiceHub:    serviceHub,
-					endpointCache: sync.Map{},
-					limiter:       rate.NewLimiter(rate.Every(time.Duration(1e9/qps)*time.Nanosecond), qps), //每隔1E9/qps纳秒产生一个令牌，即一秒钟之内产生qps个令牌。令牌桶的容量为qps
-				}
+	proxyOnce.Do(func() {
+		serviceHub := GetServiceHub(etcdServers, heartbeatFrequency)
+		if serviceHub != nil {
+			proxy = &HubProxy{
+				ServiceHub:    serviceHub,
+				endpointCache: sync.Map{},
+				limiter:       rate.NewLimiter(rate.Every(time.Duration(1e9/qps)*time.Nanosecond), qps), //每隔1E9/qps纳秒产生一个令牌，即一秒钟之内产生qps个令牌。令牌桶的容量为qps
 			}
-		})
-	}
+		}
+	})
 	return proxy
 }
 

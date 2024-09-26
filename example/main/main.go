@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/Orisun/radic/v2/demo/handler"
-	"github.com/Orisun/radic/v2/internal/kvdb"
+	"github.com/Orisun/radic/v2/example/handler"
+	"github.com/Orisun/radic/v2/types"
 	"github.com/Orisun/radic/v2/util"
 	"github.com/gin-gonic/gin"
 )
@@ -21,7 +21,7 @@ var (
 )
 
 var (
-	dbType      = kvdb.BOLT                             //正排索引使用哪种KV数据库
+	dbType      = types.BOLT                            //正排索引使用哪种KV数据库
 	csvFile     = util.RootPath + "data/bili_video.csv" //原始的数据文件，由它来创建索引
 	etcdServers = []string{"127.0.0.1:2379"}            //etcd集群的地址
 )
@@ -30,11 +30,11 @@ func StartGin() {
 	engine := gin.Default()
 	gin.SetMode(gin.ReleaseMode)
 
-	engine.Static("js", "demo/views/js")
-	engine.Static("css", "demo/views/css")
-	engine.Static("img", "demo/views/img")
-	engine.StaticFile("/favicon.ico", "img/dqq.png")                            //在url中访问文件/favicon.ico，相当于访问文件系统中的views/img/dqq.png文件
-	engine.LoadHTMLFiles("demo/views/search.html", "demo/views/up_search.html") //使用这些.html文件时就不需要加路径了
+	engine.Static("js", "example/views/js")
+	engine.Static("css", "example/views/css")
+	engine.Static("img", "example/views/img")
+	engine.StaticFile("/favicon.ico", "img/dqq.png")                                  //在url中访问文件/favicon.ico，相当于访问文件系统中的views/img/dqq.png文件
+	engine.LoadHTMLFiles("example/views/search.html", "example/views/up_search.html") //使用这些.html文件时就不需要加路径了
 
 	engine.Use(handler.GetUserInfo)                                                                //全局中间件
 	classes := [...]string{"资讯", "社会", "热点", "生活", "知识", "环球", "游戏", "综合", "日常", "影视", "科技", "编程"} //数组，非切片
@@ -63,8 +63,8 @@ func main() {
 	}
 }
 
-// go run ./demo/main -mode=1 -index=false -port=5678 -dbPath=data/local_db/video_bolt
-// go run ./demo/main -mode=2 -index=false -port=5600 -dbPath=data/local_db/video_bolt -totalWorkers=2 -workerIndex=0
-// go run ./demo/main -mode=2 -index=false -port=5601 -dbPath=data/local_db/video_bolt -totalWorkers=2 -workerIndex=1
+// go run ./example/main -mode=1 -index=false -port=5678 -dbPath=data/local_db/video_bolt
+// go run ./example/main -mode=2 -index=false -port=5600 -dbPath=data/local_db/video_bolt -totalWorkers=2 -workerIndex=0
+// go run ./example/main -mode=2 -index=false -port=5601 -dbPath=data/local_db/video_bolt -totalWorkers=2 -workerIndex=1
 // 查看有没有注册上  etcdctl get --prefix "/radic"
-// go run ./demo/main -mode=3 -index=false -port=5678
+// go run ./example/main -mode=3 -index=false -port=5678

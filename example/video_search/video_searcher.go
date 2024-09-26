@@ -5,10 +5,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Orisun/radic/v2/demo"
-	"github.com/Orisun/radic/v2/demo/video_search/common"
-	"github.com/Orisun/radic/v2/demo/video_search/filter"
-	"github.com/Orisun/radic/v2/demo/video_search/recaller"
+	demo "github.com/Orisun/radic/v2/example"
+	"github.com/Orisun/radic/v2/example/video_search/common"
+	"github.com/Orisun/radic/v2/example/video_search/filter"
+	"github.com/Orisun/radic/v2/example/video_search/recaller"
 	"github.com/Orisun/radic/v2/util"
 	"golang.org/x/exp/maps"
 )
@@ -27,6 +27,7 @@ type VideoSearcher struct {
 	Filters   []Filter
 }
 
+// Builder模式
 func (searcher *VideoSearcher) WithRecaller(recaller ...Recaller) {
 	searcher.Recallers = append(searcher.Recallers, recaller...)
 }

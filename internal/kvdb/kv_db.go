@@ -4,20 +4,15 @@ import (
 	"os"
 	"strings"
 
+	"github.com/Orisun/radic/v2/types"
 	"github.com/Orisun/radic/v2/util"
-)
-
-// 几种常见的基于LSM-tree算法实现的KV数据库
-const (
-	BOLT = iota
-	BADGER
 )
 
 // redis也是一种KV数据库，读者可以自行用redis实现IKeyValueDB接口
 type IKeyValueDB interface {
 	Open() error                              //初始化DB
 	GetDbPath() string                        //获取存储数据的目录
-	Set(k, v []byte) error                    //写入<key, value>
+	Set(k, v []byte) error                    //写入<key, value>。Document的业务ID作为key，Document作为value。
 	BatchSet(keys, values [][]byte) error     //批量写入<key, value>
 	Get(k []byte) ([]byte, error)             //读取key对应的value
 	BatchGet(keys [][]byte) ([][]byte, error) //批量读取，注意不保证顺序
@@ -47,7 +42,7 @@ func GetKvDb(dbtype int, path string) (IKeyValueDB, error) { //通过Get函数�
 
 	var db IKeyValueDB
 	switch dbtype {
-	case BADGER:
+	case types.BADGER:
 		db = new(Badger).WithDataPath(path)
 	default: //默认使用bolt
 		db = new(Bolt).WithDataPath(path).WithBucket("radic") //Builder生成器模式

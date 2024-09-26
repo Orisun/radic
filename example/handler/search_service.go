@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Orisun/radic/v2/demo"
-	"github.com/Orisun/radic/v2/demo/video_search"
-	"github.com/Orisun/radic/v2/demo/video_search/common"
+	demo "github.com/Orisun/radic/v2/example"
+	"github.com/Orisun/radic/v2/example/video_search"
+	"github.com/Orisun/radic/v2/example/video_search/common"
 	"github.com/Orisun/radic/v2/index_service"
 	"github.com/Orisun/radic/v2/types"
 	"github.com/Orisun/radic/v2/util"

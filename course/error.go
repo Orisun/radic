@@ -2,11 +2,7 @@ package course
 
 import (
 	"fmt"
-	"log"
 	"reflect"
-
-	"github.com/Orisun/radic/v2/course/dao"
-	"github.com/go-sql-driver/mysql"
 )
 
 func main() {
