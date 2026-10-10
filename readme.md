@@ -90,5 +90,3 @@ for _, doc := range docs {
     }
 }
 ```
-
-<img src="img/微信公众号.png" width="700"/>  
